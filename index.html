@@ -1,0 +1,3116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI先生 — 日本語文法学習</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap">
+  <style>
+    * { font-family: 'Noto Sans JP', -apple-system, 'Hiragino Sans', sans-serif; }
+
+    @keyframes gradShift {
+      0%,100%{ background-position:0% 50%; } 50%{ background-position:100% 50%; }
+    }
+    .gradient-text {
+      background: linear-gradient(135deg,#7c3aed,#db2777,#2563eb);
+      background-size:300% 300%; animation:gradShift 5s ease infinite;
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    }
+
+    @keyframes fadeInUp {
+      from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)}
+    }
+    .fiu  {animation:fadeInUp .4s ease-out both}
+    .fiu1 {animation:fadeInUp .4s .10s ease-out both}
+    .fiu2 {animation:fadeInUp .4s .20s ease-out both}
+    .fiu3 {animation:fadeInUp .4s .32s ease-out both}
+    .fiu4 {animation:fadeInUp .4s .44s ease-out both}
+
+    @keyframes bDot {
+      0%,80%,100%{transform:scale(.5);opacity:.4} 40%{transform:scale(1);opacity:1}
+    }
+    .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#8b5cf6}
+    .dot:nth-child(1){animation:bDot 1.3s ease-in-out 0s infinite}
+    .dot:nth-child(2){animation:bDot 1.3s ease-in-out .15s infinite}
+    .dot:nth-child(3){animation:bDot 1.3s ease-in-out .30s infinite}
+
+    @keyframes float {0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)}}
+    .floating{animation:float 2.6s ease-in-out infinite}
+
+    @keyframes popIn {
+      0%{transform:scale(.5);opacity:0} 70%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1}
+    }
+    .pop-in{animation:popIn .42s ease-out both}
+
+    @keyframes slideInRight {
+      from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1}
+    }
+    .slide-in{animation:slideInRight .35s cubic-bezier(.22,1,.36,1) both}
+
+    @keyframes growUp {
+      from{transform:scale(.8) translateY(10px);opacity:0} to{transform:scale(1) translateY(0);opacity:1}
+    }
+    .grow-up{animation:growUp .5s cubic-bezier(.34,1.56,.64,1) both}
+
+    /* ナレッジバッジ */
+    @keyframes pulse-badge {
+      0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,.4)}
+      50%{box-shadow:0 0 0 6px rgba(124,58,237,0)}
+    }
+    .badge-pulse{animation:pulse-badge 2s ease-in-out infinite}
+
+    /* 成長トースト */
+    @keyframes toastIn {
+      from{transform:translateY(80px);opacity:0} to{transform:translateY(0);opacity:1}
+    }
+    @keyframes toastOut {
+      from{transform:translateY(0);opacity:1} to{transform:translateY(80px);opacity:0}
+    }
+    .toast-in {animation:toastIn .4s cubic-bezier(.22,1,.36,1) both}
+    .toast-out{animation:toastOut .3s ease-in both}
+
+    .opt-card{transition:transform .18s,box-shadow .18s;cursor:pointer}
+    .opt-card:not(:disabled):hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(139,92,246,.18)}
+    .opt-card:not(:disabled):active{transform:translateY(0)}
+
+    .chip{transition:background .15s,color .15s}
+    .chip:hover{background:#ede9fe;color:#6d28d9}
+
+    textarea:focus,input:focus,select:focus{outline:none;box-shadow:0 0 0 3px rgba(139,92,246,.25)}
+
+    /* Admin panel */
+    .admin-overlay{
+      position:fixed;inset:0;z-index:50;
+      background:rgba(15,10,40,.6);backdrop-filter:blur(6px);
+    }
+    .admin-panel{
+      position:fixed;top:0;right:0;bottom:0;width:100%;max-width:520px;
+      background:#faf9ff;overflow-y:auto;z-index:51;
+    }
+    .form-label{display:block;font-size:.75rem;font-weight:700;color:#6d28d9;margin-bottom:4px}
+    .form-input{
+      width:100%;border:2px solid #e9d5ff;border-radius:12px;padding:8px 12px;
+      font-size:.875rem;color:#374151;transition:border-color .2s;background:#fff;
+    }
+    .form-input:focus{border-color:#8b5cf6}
+
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#ddd6fe;border-radius:3px}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-violet-50 via-rose-50 to-sky-50">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+/* ══════════════════════════════════════════════
+   SEED DATABASE  ←「デフォルトのナレッジ」
+   ══════════════════════════════════════════════ */
+const SEED_DB = [
+  { id:'te_mitai', pat_str:'[てで]みたい', name:'〜てみたい', romaji:'～te mitai', level:'N4',
+    tag_zh:'想试着做〜', summary_zh:'表达想要尝试某件事的愿望，比「たい」更强调"试着挑战"的感觉。',
+    conj_rule:'动词て形 ＋ みたい', conj_ex:'食べる → 食べてみたい',
+    detail_zh:'「みたい」来自「みる（试试看）」加上愿望助动词「たい」，整体表示"想试着做某事"。与单纯的「～たい（想做）」相比，「～てみたい」含有好奇心或挑战精神的语气。否定形为「～てみたくない」，过去形为「～てみたかった」。',
+    examples:[{ja:'日本料理を作ってみたい。',zh:'想试着做日本料理。'},{ja:'スカイダイビングをやってみたい。',zh:'想试试跳伞。'}],
+    quiz:{q_ja:'富士山に（　　）みたいです。',q_zh:'我想试着攀登富士山。括号里该填什么？',
+      opts:[{id:'A',text:'登って',correct:true},{id:'B',text:'登り',correct:false}],
+      ok_msg:'「登る」のて形は「登って」。登って＋みたい ✅',ng_msg:'「登り」はます形です。て形（登って）を使います。'} },
+  { id:'ta_koto', pat_str:'たことがある|たことがあり', name:'〜たことがある', romaji:'～ta koto ga aru', level:'N4',
+    tag_zh:'有过〜的经历', summary_zh:'表示过去曾经有过某种体验或经历，用于分享人生经验。',
+    conj_rule:'动词た形 ＋ ことがある', conj_ex:'食べた ＋ ことがある → 食べたことがある',
+    detail_zh:'「こと」是形式名词，表示"事情/经历"。「ことがある」整体表示"有过～的经历"。疑问句「～たことがありますか？」用于询问对方是否有某种体验。否定形「～たことがない」表示"从来没有过～"。',
+    examples:[{ja:'富士山に登ったことがあります。',zh:'我有过爬富士山的经历。'},{ja:'日本のアニメを見たことがありますか？',zh:'你有没有看过日本动画？'}],
+    quiz:{q_ja:'北海道に行った（　　）があります。',q_zh:'我有过去北海道的经历。括号里该填什么？',
+      opts:[{id:'A',text:'こと',correct:true},{id:'B',text:'もの',correct:false}],
+      ok_msg:'「たことがある」はセットで覚えましょう ✅',ng_msg:'「もの」は物・道理を指します。経験には「こと」を使います。'} },
+  { id:'tai', pat_str:'たい', name:'〜たい', romaji:'～tai', level:'N5',
+    tag_zh:'想要做〜', summary_zh:'表达说话人本人想做某事的愿望，是最基础的愿望表达。',
+    conj_rule:'动词ます形（去掉ます）＋ たい', conj_ex:'食べます → 食べ ＋ たい → 食べたい',
+    detail_zh:'「たい」是愿望助动词，接在动词ます形词干后，表示说话人自身的愿望。注意：表示第三者愿望时要用「～たがる」。否定形「～たくない」、过去形「～たかった」。',
+    examples:[{ja:'日本語を上手に話したい。',zh:'想把日语说好。'},{ja:'新しいパソコンを買いたいです。',zh:'想买新电脑。'}],
+    quiz:{q_ja:'日本へ（　　）たいです。',q_zh:'我想去日本。括号里该填什么？',
+      opts:[{id:'A',text:'行き',correct:true},{id:'B',text:'行って',correct:false}],
+      ok_msg:'「行く」のます形の語幹は「行き」。行き＋たい ✅',ng_msg:'「行って」はて形。「たい」の前はます形の語幹（行き）を使います。'} },
+  { id:'nagara', pat_str:'ながら', name:'〜ながら', romaji:'～nagara', level:'N4',
+    tag_zh:'一边〜一边〜', summary_zh:'表示同一主语同时进行两个动作，从属动作在前，主要动作在后。',
+    conj_rule:'动词ます形（去掉ます）＋ ながら', conj_ex:'聴きます → 聴き ＋ ながら → 聴きながら',
+    detail_zh:'「ながら」连接两个同时进行的动作，主语必须是同一人。句子的重点在后半句（主要动作）。注意：主语不同时不能用「ながら」。',
+    examples:[{ja:'音楽を聴きながら、勉強します。',zh:'一边听音乐，一边学习。'},{ja:'歩きながらスマホを見るのは危ない。',zh:'一边走路一边看手机很危险。'}],
+    quiz:{q_ja:'コーヒーを（　　）ながら、本を読む。',q_zh:'一边喝咖啡一边读书。括号里该填什么？',
+      opts:[{id:'A',text:'飲み',correct:true},{id:'B',text:'飲んで',correct:false}],
+      ok_msg:'「飲む」のます形の語幹は「飲み」。飲み＋ながら ✅',ng_msg:'「飲んで」はて形。「ながら」の前はます形の語幹（飲み）です。'} },
+  { id:'te_kara', pat_str:'[てで]から', name:'〜てから', romaji:'～te kara', level:'N5',
+    tag_zh:'做完〜之后', summary_zh:'强调前一个动作完成之后，再进行后一个动作的先后顺序。',
+    conj_rule:'动词て形 ＋ から', conj_ex:'食べます → 食べて ＋ から → 食べてから',
+    detail_zh:'「てから」强调动作的顺序性，前面的动作必须完成才能做后面的动作。与「～あとで」意思相近，但「てから」更强调"必须先做前面的事"的必要性。',
+    examples:[{ja:'手を洗ってから、ご飯を食べます。',zh:'洗完手后再吃饭。'},{ja:'大学を卒業してから、働きます。',zh:'大学毕业后开始工作。'}],
+    quiz:{q_ja:'宿題をし（　　）から、ゲームをしていい？',q_zh:'做完作业后可以玩游戏吗？括号里该填什么？',
+      opts:[{id:'A',text:'て',correct:true},{id:'B',text:'た',correct:false}],
+      ok_msg:'「する」のて形は「して」。して＋から ✅',ng_msg:'「した」は過去形。「てから」にはて形（して）が必要です。'} },
+  { id:'toki', pat_str:'とき', name:'〜とき（に）', romaji:'～toki (ni)', level:'N4',
+    tag_zh:'〜的时候', summary_zh:'表示某一时间点或时间段。动词时态的选择（現在形 vs 過去形）是重点！',
+    conj_rule:'动词普通形 / な形容词＋な / 名词＋の ＋ とき', conj_ex:'子ども ＋ の ＋ とき → 子どものとき',
+    detail_zh:'「とき」表示"某个时间点/时间段"。动词辞书形＋とき → 还未做，正准备做的时候；动词た形＋とき → 动作完成之后的时间点。这个时态区别是日语中的重要难点！',
+    examples:[{ja:'困ったとき、先生に聞いてください。',zh:'遇到困难的时候，请问老师。'},{ja:'子どものとき、よく公園で遊びました。',zh:'小时候经常在公园玩。'}],
+    quiz:{q_ja:'日本に（　　）とき、富士山を見たい。',q_zh:'去日本（还没去）的时候想看富士山。括号里该填什么？',
+      opts:[{id:'A',text:'行く',correct:true},{id:'B',text:'行った',correct:false}],
+      ok_msg:'まだ行っていないので現在形「行く」を使います ✅',ng_msg:'「行ったとき」は「着いてから」の意味。まだ行っていないので「行く」が正解。'} },
+  { id:'te_mo_ii', pat_str:'[てで]もいい', name:'〜てもいい', romaji:'～te mo ii', level:'N5',
+    tag_zh:'可以做〜（许可）', summary_zh:'表示允许或许可做某事。用疑问句征求对方许可。',
+    conj_rule:'动词て形 ＋ もいい', conj_ex:'食べます → 食べて ＋ もいい → 食べてもいい',
+    detail_zh:'「てもいい」表示"可以做～/被允许做～"。用疑问句「～てもいいですか？」征求许可，客气说法是「～てもよろしいですか？」。否定形「～てはいけない」表示禁止。',
+    examples:[{ja:'ここで写真を撮ってもいいですか？',zh:'这里可以拍照吗？'},{ja:'窓を開けてもいいですよ。',zh:'可以开窗哦。'}],
+    quiz:{q_ja:'先に帰っ（　　）いいですか？',q_zh:'我可以先回去吗？括号里该填什么？',
+      opts:[{id:'A',text:'ても',correct:true},{id:'B',text:'たら',correct:false}],
+      ok_msg:'「帰って＋も＋いい」で許可を求めます ✅',ng_msg:'「帰ったらいいですか」は不自然。許可には「てもいい」を使います。'} },
+  { id:'koto_dekiru', pat_str:'ことができ', name:'〜ことができる', romaji:'～koto ga dekiru', level:'N4',
+    tag_zh:'能够做〜（能力・可能）', summary_zh:'表示具备某种能力，或在某条件下可以做某事，比可能形更正式。',
+    conj_rule:'动词辞书形 ＋ ことができる', conj_ex:'話す ＋ ことができる → 話すことができる',
+    detail_zh:'与可能形（例：話せる）意思相近，但「ことができる」更正式，多用于书面语或正式场合。「ことが」后面也可接「できない」表示"不能做～"。',
+    examples:[{ja:'私は日本語を話すことができます。',zh:'我能说日语。'},{ja:'ここで泳ぐことができますか？',zh:'这里可以游泳吗？'}],
+    quiz:{q_ja:'彼女はピアノを（　　）ことができる。',q_zh:'她能弹钢琴。括号里该填什么？',
+      opts:[{id:'A',text:'弾く',correct:true},{id:'B',text:'弾いて',correct:false}],
+      ok_msg:'「ことができる」の前は辞書形（弾く）を使います ✅',ng_msg:'「弾いて」はて形。「ことができる」の前は辞書形（弾く）が必要です。'} },
+
+  // ══ みんなの日本語 準拠 ／ N5 基礎文法 ══
+  { id:'ga_suki', pat_str:'が好き|が嫌い|が上手|が下手|が得意|が苦手', name:'〜が好きです', romaji:'～ga suki desu', level:'N5',
+    tag_zh:'喜欢〜（好き嫌い・感情）', summary_zh:'表示喜好、厌恶、擅长、不擅长。注意对象要用「が」，不能用「を」！',
+    conj_rule:'好き・嫌い・上手・下手の対象 ＋ が', conj_ex:'音楽が好きです ／ 英語が上手です',
+    detail_zh:'「好き/嫌い/上手/下手」などの感情・能力を表す形容詞の前には、助詞「を」でなく「が」を使います。これは日本語学習者が最もよく間違えるポイントの一つ。疑問文「どんな〜が好きですか？」は好みを聞く定番表現。否定形は「好きじゃないです」「嫌いです」。',
+    examples:[{ja:'私はすしが大好きです。',zh:'我超喜欢寿司。'},{ja:'日本語の歌が上手ですね。',zh:'日语歌唱得很好呢。'}],
+    quiz:{q_ja:'彼女は音楽（　　）好きです。',q_zh:'她喜欢音乐。括号里该填什么？',
+      opts:[{id:'A',text:'が',correct:true},{id:'B',text:'を',correct:false}],
+      ok_msg:'好き・嫌い・上手・下手の前は「が」 ✅',ng_msg:'「好き」の前は「を」ではなく「が」です。これは大切なポイント！'} },
+  { id:'o_kudasai', pat_str:'をください|を見せてください|をみせてください|をお願い', name:'〜をください', romaji:'～o kudasai', level:'N5',
+    tag_zh:'请给我〜（购物・请求）', summary_zh:'购物或请求时，礼貌地要求对方给某物的表达。「ください」来自「くださる」的命令形。',
+    conj_rule:'欲しいもの ＋ を ＋ ください', conj_ex:'これをください ／ 水をふたつください',
+    detail_zh:'「〜をください」是购物场景最常用的句型，意思是"请给我〜"。加数量词：「ひとつ（一个）・ふたつ（两个）ください」。更礼貌的说法是「〜をいただけますか」。询问价格：「これはいくらですか？（这个多少钱）」。',
+    examples:[{ja:'すみません、これをひとつください。',zh:'不好意思，请给我一个这个。'},{ja:'メニューを見せてください。',zh:'请让我看看菜单。'}],
+    quiz:{q_ja:'コーヒーをふたつ（　　）。',q_zh:'请给我两杯咖啡。括号里该填什么？',
+      opts:[{id:'A',text:'ください',correct:true},{id:'B',text:'あります',correct:false}],
+      ok_msg:'「〜をください」で丁寧にお願いできます ✅',ng_msg:'「あります」は存在の表現。お願いするときは「ください」を使います。'} },
+  { id:'ga_arimasu', pat_str:'があります|がいます|にあります|にいます', name:'あります・います', romaji:'arimasu / imasu', level:'N5',
+    tag_zh:'有〜/在〜（存在表达）', summary_zh:'「あります」用于无生命物体，「います」用于有生命的人或动物。日语中最重要的区分之一！',
+    conj_rule:'物 ＋ があります ／ 人・動物 ＋ がいます', conj_ex:'本があります ／ 猫がいます',
+    detail_zh:'「あります」用于植物、物品等无生命体；「います」用于人和动物等有生命体。位置表达：「〜の上（うえ）/下（した）/前（まえ）/後ろ（うしろ）/中（なか）/隣（となり）にあります/います」。否定形：「ありません」「いません」。',
+    examples:[{ja:'机の上に本があります。',zh:'桌子上有书。'},{ja:'公園に子どもたちがいます。',zh:'公园里有孩子们。'}],
+    quiz:{q_ja:'部屋に猫が（　　）。',q_zh:'房间里有猫。括号里该填什么？',
+      opts:[{id:'A',text:'います',correct:true},{id:'B',text:'あります',correct:false}],
+      ok_msg:'猫は生き物なので「います」 ✅',ng_msg:'「あります」は物に使います。猫は生き物なので「います」が正解。'} },
+  { id:'doko_desu', pat_str:'どこ.*か|はどこ|どちら.*か|どこに', name:'〜はどこですか', romaji:'～wa doko desu ka', level:'N5',
+    tag_zh:'〜在哪里？（问位置）', summary_zh:'询问场所或位置的基本句型。「どこ」是"哪里"，「どちら」是更礼貌的说法。',
+    conj_rule:'场所 ＋ は ＋ どこ ＋ ですか', conj_ex:'駅はどこですか？ → あそこです',
+    detail_zh:'「どこ」用于询问位置或场所。回答用：「ここ（这里）・そこ（那里）・あそこ（那里）」，或方向词「右（みぎ）・左（ひだり）・まっすぐ」。礼貌说法「どちら」。完整形式「〜はどこにありますか？/いますか？」',
+    examples:[{ja:'すみません、駅はどこですか？',zh:'请问，车站在哪里？'},{ja:'お手洗いはどこにありますか？',zh:'洗手间在哪里？'}],
+    quiz:{q_ja:'コンビニは（　　）ですか？',q_zh:'便利店在哪里？括号里该填什么？',
+      opts:[{id:'A',text:'どこ',correct:true},{id:'B',text:'だれ',correct:false}],
+      ok_msg:'場所を聞くには「どこ」を使います ✅',ng_msg:'「だれ」は人を聞くとき。場所には「どこ」です。'} },
+  { id:'ni_ikimasu', pat_str:'[にへ]行き|[にへ]来ます|[にへ]帰り|に行く|へ行く', name:'〜に/へ行きます', romaji:'～ni / e ikimasu', level:'N5',
+    tag_zh:'去〜（移动目的地）', summary_zh:'「に」「へ」表示移动的目的地方向。行く・来る・帰るの3つが基本移動動詞。',
+    conj_rule:'场所 ＋ に/へ ＋ 行きます/来ます/帰ります', conj_ex:'学校に行きます ／ 日本へ来ました',
+    detail_zh:'「に」表示到达点、目的地。「へ」（读作"e"）强调移动方向，口语中常可互换。时间+に：「3時に行きます（3点去）」。与手段助词区别：「電車で学校に行きます（坐电车去学校）」。',
+    examples:[{ja:'毎朝、学校に行きます。',zh:'每天早上去学校。'},{ja:'来週、日本へ行きます。',zh:'下周去日本。'}],
+    quiz:{q_ja:'明日、図書館（　　）行きます。',q_zh:'明天去图书馆。括号里该填什么？',
+      opts:[{id:'A',text:'に',correct:true},{id:'B',text:'で',correct:false}],
+      ok_msg:'行き先（目的地）には「に」か「へ」を使います ✅',ng_msg:'「で」は手段・場所を表します。目的地には「に/へ」が正解。'} },
+  { id:'de_ikimasu', pat_str:'電車で|バスで|自転車で|タクシーで|飛行機で|徒歩で|で行きます|で来ます|で帰ります', name:'〜で行きます（移動手段）', romaji:'～de ikimasu', level:'N5',
+    tag_zh:'乘坐〜去（交通工具・手段）', summary_zh:'助词「で」表示动作的手段或方式。"坐什么交通工具去某处"的常用句型。',
+    conj_rule:'交通手段 ＋ で ＋ 行きます/来ます/帰ります', conj_ex:'電車で行きます ／ 自転車で来ます',
+    detail_zh:'「で」表示手段，意为"用/乘/坐"。交通工具：バス（公交）・電車（电车）・タクシー（出租）・自転車（自行车）・飛行機（飞机）・徒歩/歩いて（步行）。「一人で（独自）」也使用「で」。询问：「何で来ますか？（坐什么来？）」',
+    examples:[{ja:'毎日電車で会社に行きます。',zh:'每天坐电车去公司。'},{ja:'自転車で10分ぐらいです。',zh:'骑自行车大约10分钟。'}],
+    quiz:{q_ja:'学校まで自転車（　　）来ます。',q_zh:'骑自行车来学校。括号里该填什么？',
+      opts:[{id:'A',text:'で',correct:true},{id:'B',text:'に',correct:false}],
+      ok_msg:'交通手段・移動方法には「で」を使います ✅',ng_msg:'「に」は目的地。交通手段（自転車で）には「で」が正解。'} },
+  { id:'kore_sore', pat_str:'これは|それは|あれは|この.*です|その.*です|あの.*です', name:'これ・それ・あれ', romaji:'kore / sore / are', level:'N5',
+    tag_zh:'这/那/那（指示代词）', summary_zh:'根据说话人和听话人的距离关系区分使用的指示代词系统。「こ/そ/あ/ど」の4系列。',
+    conj_rule:'これ/それ/あれ（独立）／ この/その/あの ＋ 名词', conj_ex:'これは本です ／ この本はおもしろい',
+    detail_zh:'「こ」系（これ/ここ/こちら）靠近说话人；「そ」系（それ/そこ/そちら）靠近听话人；「あ」系（あれ/あそこ/あちら）双方都远；「ど」系（どれ/どこ/どちら）疑问词。名词修饰时用「この/その/あの/どの ＋ 名词」。',
+    examples:[{ja:'これは何ですか？',zh:'这是什么？'},{ja:'あれは誰の傘ですか？',zh:'那把伞是谁的？'}],
+    quiz:{q_ja:'（　　）は日本語の本です。（目の前の本）',q_zh:'这（眼前的）是日语书。括号里该填什么？',
+      opts:[{id:'A',text:'これ',correct:true},{id:'B',text:'あれ',correct:false}],
+      ok_msg:'目の前・手元にある物は「これ」 ✅',ng_msg:'「あれ」は遠くにある物。目の前は「これ」です。'} },
+  { id:'te_kudasai', pat_str:'[てで]ください|[てで]くださいませ', name:'〜てください', romaji:'～te kudasai', level:'N5',
+    tag_zh:'请做〜（请求・指示）', summary_zh:'请求或指示对方做某事的礼貌表达。日常会话中最常用的请求形式。',
+    conj_rule:'动词て形 ＋ ください', conj_ex:'座る → 座って ＋ ください → 座ってください',
+    detail_zh:'「〜てください」请求对方做某事，意为"请做〜"。否定请求「〜ないでください（请不要做〜）」。更礼貌的说法「〜ていただけますか（能否请您做〜）」。教室でよく使う：「聞いてください/見てください/言ってください」。',
+    examples:[{ja:'ここに名前を書いてください。',zh:'请在这里写名字。'},{ja:'もう少しゆっくり話してください。',zh:'请说慢一点。'}],
+    quiz:{q_ja:'もう一度言っ（　　）。',q_zh:'请再说一遍。括号里该填什么？',
+      opts:[{id:'A',text:'てください',correct:true},{id:'B',text:'てもいい',correct:false}],
+      ok_msg:'「〜てください」で丁寧にお願いできます ✅',ng_msg:'「てもいい」は許可（〜していい？）。お願いするときは「てください」を使います。'} },
+];
+
+const STORAGE_KEY = 'ai_sensei_db_v4';
+const FALLBACK = {
+  id:'fallback', pat_str:'', name:'〜です・〜ます', romaji:'～desu / ～masu', level:'N5',
+  tag_zh:'礼貌体的基本表达', summary_zh:'「です」「ます」是丁宁体的标志，用于正式场合说话。',
+  conj_rule:'名词/形容词 ＋ です ／ 动词ます形', conj_ex:'学生 → 学生です ／ 食べる → 食べます',
+  detail_zh:'「です」和「ます」构成日语敬体（丁宁体），在正式场合或对长辈说话时使用。这是日语中最基础的礼貌表达。',
+  examples:[{ja:'私は学生です。',zh:'我是学生。'},{ja:'毎日日本語を勉強します。',zh:'每天学习日语。'}],
+  quiz:{q_ja:'これは本（　　）。',q_zh:'这是书。括号里该填什么？（礼貌体）',
+    opts:[{id:'A',text:'です',correct:true},{id:'B',text:'ます',correct:false}],
+    ok_msg:'名詞＋「です」で礼貌な断定になります ✅',ng_msg:'「ます」は動詞につきます。名詞の後には「です」を使います。'},
+};
+
+/* ══════════════════════════════════════════════
+   TEXTBOOK AUDIO RESOURCES（教材音声リソース）
+   ══════════════════════════════════════════════ */
+const TEXTBOOK_RESOURCES = [
+  {
+    id:'mnn', emoji:'🔵', title:'みんなの日本語', publisher:'スリーエーネットワーク',
+    headerCls:'bg-blue-600', borderCls:'border-blue-200',
+    levels:[
+      { label:'初級 I',  url:'https://www.3anet.co.jp/np/resrcs/230020/', badge:'無料・直DL', bc:'bg-emerald-100 text-emerald-700', info:'87トラック / 92.58MB / MP3' },
+      { label:'初級 II', url:'https://www.3anet.co.jp/np/resrcs/240020/', badge:'無料・直DL', bc:'bg-emerald-100 text-emerald-700', info:'75トラック / 100.2MB / MP3' },
+      { label:'中級 I',  url:'https://www.3anet.co.jp/np/resrcs/280020/', badge:'無料・直DL', bc:'bg-emerald-100 text-emerald-700', info:'41トラック / 68MB / MP3' },
+      { label:'中級 II', url:'https://www.3anet.co.jp/np/resrcs/290020/', badge:'無料・直DL', bc:'bg-emerald-100 text-emerald-700', info:'27トラック / 112MB / MP3' },
+    ],
+    note:'登録・購入不要で直接DL可能 ✅　全4レベル合計372.8MB・230トラック確認済み'
+  },
+  {
+    id:'dekiru', emoji:'🟠', title:'できる日本語', publisher:'アルク出版（第2版 / 2025年）',
+    headerCls:'bg-orange-500', borderCls:'border-orange-200',
+    isBooco: true,
+    levels:[
+      { label:'初級',   url:'https://www.booco.jp/', badge:'booco', bc:'bg-purple-100 text-purple-700', info:'MP3 ＋ スクリプト' },
+      { label:'初中級', url:'https://www.booco.jp/', badge:'booco', bc:'bg-purple-100 text-purple-700', info:'MP3 ＋ スクリプト' },
+      { label:'中級',   url:'https://www.booco.jp/', badge:'booco', bc:'bg-purple-100 text-purple-700', info:'MP3 ＋ スクリプト' },
+    ],
+    note:'↓ 下の「boocoをDLして聴く」ボタンからアプリをインストール → 書籍シリアルコードを入力 → 音声が解放されます'
+  },
+  {
+    id:'try', emoji:'🔴', title:'TRY! 文法から伸ばす日本語', publisher:'アスク出版',
+    headerCls:'bg-rose-600', borderCls:'border-rose-200',
+    levels:[
+      { label:'N5', url:'https://ask-books.com/jlpt-try/', badge:'書籍付属', bc:'bg-gray-100 text-gray-600', info:'MP3 / ZIP' },
+      { label:'N4', url:'https://ask-books.com/jlpt-try/', badge:'書籍付属', bc:'bg-gray-100 text-gray-600', info:'MP3 / ZIP' },
+      { label:'N3', url:'https://ask-books.com/jlpt-try/', badge:'書籍付属', bc:'bg-gray-100 text-gray-600', info:'MP3 / ZIP' },
+      { label:'N2', url:'https://storage.ask-books.com/uploads/books/9784866396774/audios/audios.zip', badge:'直DL確認済', bc:'bg-emerald-100 text-emerald-700', info:'110MB / MP3 / ZIP（中国語版・200 OK確認）' },
+      { label:'N1', url:'https://ask-books.com/jlpt-try/', badge:'書籍付属', bc:'bg-gray-100 text-gray-600', info:'MP3 / ZIP' },
+    ],
+    note:'Apple Podcast・Spotifyで全レベル無料ストリーミング可。書籍なしで聴ける！'
+  },
+];
+
+/* ══════════════════════════════════════════════
+   LEARNER PROFILE & CURRICULUM CONTEXT
+   出典：耳と口で覚える1ヶ月集中カリキュラム（中国語話者向け）
+   ══════════════════════════════════════════════ */
+const LEARNER_PROFILE = {
+  target:    '中国語母語話者 ／ 読み書き困難な学習者',
+  method:    '完全音声・ローマ字中心（漢字・ひらがな不使用）',
+  duration:  '1ヶ月集中 全8回',
+  goal:      '日常会話を自力でこなす（文字なしで）',
+  philosophy:'耳と口で覚える — 文字に頼らない！',
+  tagline:   '用耳朵和嘴巴学日语！',
+  hw:        '毎回：スマホに声を録音して聴き直し（自己モニタリング）',
+  eval:      '書けなくても話せればOK。流暢さ優先・正確さは第2位',
+};
+
+const CURRICULUM_CONTEXT = [
+  {
+    lesson:1, week:'第1週①', title:'Hajimemashite', titleJa:'はじめまして',
+    theme:'自己紹介', theme_cn:'自我介绍',
+    base:'みんなの日本語 第1課', grammar_ids:['desu_masu','wa_desu'],
+    key_phrases:[
+      { r:'Watashi wa ＿＿ desu.', cn:'我是～' },
+      { r:'Hajimemashite. Yoroshiku onegai shimasu.', cn:'初次见面，请多关照。' },
+      { r:'＿＿ kara kimashita.', cn:'我来自～' },
+    ],
+    cn_tip:'口诀："WATASHI WA = 我是！"「WA」是主语标记。注意：中文"是"前后都有词，日语「WA」只标主语。',
+    hw:'自己紹介文を3回録音し、聴き比べる',
+  },
+  {
+    lesson:2, week:'第1週②', title:'Kore wa nan desu ka?', titleJa:'これは何ですか',
+    theme:'モノを確認する', theme_cn:'确认事物',
+    base:'みんなの日本語 第2課', grammar_ids:['kore_sore'],
+    key_phrases:[
+      { r:'Kore wa nan desu ka?', cn:'这是什么？' },
+      { r:'Kore wa watashi no ＿＿ desu.', cn:'这是我的～' },
+      { r:'Soo desu ka. / Chigaimasu.', cn:'这样啊 / 不是那样' },
+    ],
+    cn_tip:'こそあど3层：KO-（近・这）／SO-（中・那）／A-（远・那边）。和中文"这/那"类似，但有距离层次！',
+    hw:'教室・家の物を指して5文録音',
+  },
+  {
+    lesson:3, week:'第2週①', title:'Doko ni arimasu ka?', titleJa:'どこにありますか',
+    theme:'場所・位置を言う', theme_cn:'说位置和方向',
+    base:'みんなの日本語 第3・4課', grammar_ids:['ga_arimasu','doko_desu'],
+    key_phrases:[
+      { r:'＿＿ wa doko ni arimasu ka?', cn:'～在哪里？（物）' },
+      { r:'＿＿ wa doko ni imasu ka?', cn:'～在哪里？（人）' },
+      { r:'＿＿ no mae / ushiro / naka ni arimasu.', cn:'在～的前/后/里面' },
+    ],
+    cn_tip:'口诀："活的用IMASU，死的用ARIMASU！" 方向词：UE上/SHITA下/MIGI右/HIDARI左/MAE前/USHIRO后',
+    hw:'自分の部屋の物の位置を5文録音。Googleマップで近所の場所を探して録音',
+  },
+  {
+    lesson:4, week:'第2週②', title:'Nanji desu ka?', titleJa:'何時ですか',
+    theme:'時間・約束を決める', theme_cn:'说时间和约会',
+    base:'みんなの日本語 第5・6課', grammar_ids:['ni_ikimasu'],
+    key_phrases:[
+      { r:'Ima nanji desu ka?', cn:'现在几点？' },
+      { r:'＿＿-ji ni ＿＿ e ikimasu.', cn:'～点去～' },
+      { r:'Nanji ni aimashou ka?', cn:'几点见面？' },
+    ],
+    cn_tip:'时间：時＝JI、分＝FUN/PUN。特殊变化：1分=IP-PUN, 3分=SAM-PUN, 6分=ROP-PUN, 8分=HAP-PUN',
+    hw:'起床・昼食・就寝の時間を毎日録音。友達に日本語でLINEを送る（ローマ字OK）',
+  },
+  {
+    lesson:5, week:'第3週①', title:'Resutoran de chuumon', titleJa:'レストランで注文',
+    theme:'注文・食事する', theme_cn:'在餐厅点餐',
+    base:'みんなの日本語 第8・9課', grammar_ids:['o_kudasai','ga_arimasu'],
+    key_phrases:[
+      { r:'＿＿ wo kudasai.', cn:'请给我～' },
+      { r:'＿＿ wo hitotsu kudasai.', cn:'请给我一个～' },
+      { r:'＿＿ ga arimasu ka?', cn:'有～吗？' },
+    ],
+    cn_tip:'点餐3步：①SUMIMASEN（叫服务员）②KORE WO KUDASAI（点菜）③OKAIKEI KUDASAI（结账）',
+    hw:'注文の全プロセスを一人で演じて録音。実際のレストランで試してみる！',
+  },
+  {
+    lesson:6, week:'第3週②', title:'Kaimono', titleJa:'買い物',
+    theme:'値段を聞く・買い物', theme_cn:'问价格和购物',
+    base:'みんなの日本語 第9・10課', grammar_ids:['o_kudasai'],
+    key_phrases:[
+      { r:'＿＿ wa ikura desu ka?', cn:'～多少钱？' },
+      { r:'＿＿ en desu.', cn:'～日元' },
+      { r:'Takai desu ne... / Yasui desu ne!', cn:'好贵啊… / 好便宜！' },
+    ],
+    cn_tip:'购物口诀3句：①IKURA？（多少钱）②KUDASAI！（给我）③ARIGATOU！（谢谢）— 这3句走遍日本！',
+    hw:'5つの商品の値段を録音「KONO ～ WA ～ EN DESU」×5。実際のコンビニで一つ買い物する',
+  },
+  {
+    lesson:7, week:'第4週①', title:'Ikimasu / Kimasu', titleJa:'行きます・来ます',
+    theme:'移動・交通手段', theme_cn:'移动和交通',
+    base:'みんなの日本語 第6・7課', grammar_ids:['ni_ikimasu','de_ikimasu'],
+    key_phrases:[
+      { r:'＿＿ ni ikimasu / kimasu / kaerimasu.', cn:'去/来/回～' },
+      { r:'＿＿ de ikimasu.', cn:'乘～去' },
+      { r:'Issho ni ikimashou!', cn:'一起去吧！' },
+    ],
+    cn_tip:'口诀："NI = 去哪里，DE = 怎么去！" 步行例外：ARUITE IKIMASU（不加DE，因为脚不是工具）',
+    hw:'「明日の予定」を録音する。自宅から学校への交通手段を録音',
+  },
+  {
+    lesson:8, week:'第4週②', title:'Soufukushuu', titleJa:'総復習',
+    theme:'総復習・統合会話', theme_cn:'综合复习',
+    base:'みんなの日本語 第1〜10課 全統合',
+    grammar_ids:['desu_masu','wa_desu','kore_sore','ga_arimasu','doko_desu','o_kudasai','ni_ikimasu','de_ikimasu','ga_suki'],
+    key_phrases:[
+      { r:'（全8回の集大成・3分間の統合会話）', cn:'（综合所有内容，实现3分钟自然对话）' },
+    ],
+    cn_tip:'6大句型覆盖日常80%对话：①WA～DESU ②WA DOKO DESU KA ③NI ARIMASU/IMASU ④WO KUDASAI ⑤WA IKURA ⑥DE NI IKIMASU',
+    hw:'「日本での一日」シナリオを録音（3分間）',
+  },
+];
+
+/* ══════════════════════════════════════════════
+   WEB REFERENCE RESOURCES（参考Webリソース）
+   ══════════════════════════════════════════════ */
+const WEB_RESOURCES = [
+  { id:'nihongonet', icon:'📖', label:'日本語NET — 文法リスト',
+    url:'https://nihongokyoshi-net.com/jlpt-grammars/',
+    desc:'N5〜N1 全文法項目一覧。N5=35項目、N4=75項目。例文・解説付き',
+    badge:'N5〜N1', bc:'bg-blue-100 text-blue-700' },
+  { id:'ubiq', icon:'📋', label:'U-biq 教案（みんなの日本語 全50課）',
+    url:'https://kyoan.u-biq.org/',
+    desc:'みんなの日本語 第1〜50課の教案・授業設計書。無料DL可',
+    badge:'全50課', bc:'bg-green-100 text-green-700' },
+  { id:'nihongoppi', icon:'🖼️', label:'ニホンゴピース — 無料PPTスライド',
+    url:'https://nihongodaisuki.blog/nihongopiece/',
+    desc:'みんなの日本語各課のPowerPointスライド。授業用ビジュアル教材',
+    badge:'PPT無料', bc:'bg-amber-100 text-amber-700' },
+  { id:'langoal', icon:'🗂️', label:'Langoal — N5/N4/N3 文法DB',
+    url:'https://langoal.com/grammar/',
+    desc:'ID付き構造化文法データベース。N5〜N3の文型を一覧・詳細表示',
+    badge:'構造化DB', bc:'bg-violet-100 text-violet-700' },
+  { id:'irodori', icon:'🌸', label:'いろどり — 生活の日本語（国際交流基金）',
+    url:'https://www.irodori.jpf.go.jp/',
+    desc:'国際交流基金のリソース。絵カード・教案スライドが無料で入手可',
+    badge:'国際交流基金', bc:'bg-rose-100 text-rose-700' },
+];
+
+/* LESSON_MAP: grammar id → [lesson numbers] */
+const LESSON_MAP = {};
+CURRICULUM_CONTEXT.forEach(les => {
+  (les.grammar_ids || []).forEach(gid => {
+    if (!LESSON_MAP[gid]) LESSON_MAP[gid] = [];
+    LESSON_MAP[gid].push(les.lesson);
+  });
+});
+
+/* ══════════════════════════════════════════════
+   PERSISTENT LOG / HOMEWORK / GAS URL
+   ══════════════════════════════════════════════ */
+const LOG_KEY = 'ai_sensei_log_v1';
+const HW_KEY  = 'ai_sensei_hw_v1';
+const GAS_KEY = 'ai_sensei_gas_url';
+
+function loadLogs() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch(e){ return []; } }
+function saveLogs(arr) { localStorage.setItem(LOG_KEY, JSON.stringify(arr)); }
+function appendLog(entry) {
+  const arr = loadLogs();
+  arr.unshift({...entry, savedAt: new Date().toISOString()});
+  if (arr.length > 300) arr.length = 300;
+  saveLogs(arr);
+}
+function loadHW()  { try { return JSON.parse(localStorage.getItem(HW_KEY)  || '{}'); } catch(e){ return {}; } }
+function saveHW(o) { localStorage.setItem(HW_KEY, JSON.stringify(o)); }
+function loadGasUrl()    { return localStorage.getItem(GAS_KEY) || ''; }
+function saveGasUrl(url) { localStorage.setItem(GAS_KEY, url); }
+
+function toCSV(logs) {
+  const hd = ['日時','入力文','文法名','レベル','クイズ','結果','時間(秒)','学習回'];
+  const rows = logs.map(r => [
+    r.timestamp||r.savedAt||'', r.userInput||'',
+    r.detectedGrammarName||'', r.level||'',
+    r.quizAttempted?'○':'', r.quizResult||'',
+    r.timeSpentSeconds||0, (r.lessonNumbers||[]).join('・'),
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+  return [hd.join(','), ...rows].join('\n');
+}
+function downloadCSV(content, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+content], {type:'text/csv;charset=utf-8'}));
+  a.download = filename; a.click();
+}
+
+const SAMPLES = [
+  '日本へ行きたいです','寿司を食べたことがあります','音楽を聴きながら勉強します',
+  '写真を撮ってもいいですか','日本語を話すことができます','宿題をしてから遊びます',
+  '子どものとき、よく泳ぎました','富士山に登ってみたい',
+  'すみません、駅はどこですか','これをひとつください','毎日電車で会社に行きます',
+  '猫が好きです','部屋に犬がいます','もう少しゆっくり話してください',
+];
+
+/* ─── persistence ─── */
+function loadDB() {
+  try { const s = localStorage.getItem(STORAGE_KEY); if (s) return JSON.parse(s); } catch(e){}
+  return SEED_DB;
+}
+function saveDB(db) { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+function toPat(str) { try { return new RegExp(str); } catch(e){ return null; } }
+function detect(text, db) {
+  for (const g of db) { const p = toPat(g.pat_str); if (p && p.test(text)) return g; }
+  return FALLBACK;
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+/* ─── テキスト解析用：未登録文法のヒント集 ─── */
+const GRAMMAR_HINTS = [
+  { pat_str:'[てで]しまう',            name:'〜てしまう',           romaji:'～te shimau',          level:'N4', tag_zh:'不小心做了〜（遗憾/完结）' },
+  { pat_str:'ている',                  name:'〜ている',             romaji:'～te iru',             level:'N5', tag_zh:'正在做〜 / 持续状态' },
+  { pat_str:'てほしい',                name:'〜てほしい',           romaji:'～te hoshii',          level:'N4', tag_zh:'希望对方做〜' },
+  { pat_str:'ようにする',              name:'〜ようにする',         romaji:'～you ni suru',        level:'N3', tag_zh:'努力做到〜' },
+  { pat_str:'ようになる',              name:'〜ようになる',         romaji:'～you ni naru',        level:'N3', tag_zh:'变得能够〜' },
+  { pat_str:'させる',                  name:'〜させる（使役）',     romaji:'～saseru',             level:'N4', tag_zh:'让/使对方做〜' },
+  { pat_str:'られる',                  name:'〜られる（受身）',     romaji:'～rareru',             level:'N4', tag_zh:'被〜（受身形）' },
+  { pat_str:'てあげる',                name:'〜てあげる',           romaji:'～te ageru',           level:'N4', tag_zh:'为对方做〜（给予）' },
+  { pat_str:'てくれる',                name:'〜てくれる',           romaji:'～te kureru',          level:'N4', tag_zh:'对方为我做〜（接受）' },
+  { pat_str:'てもらう',                name:'〜てもらう',           romaji:'～te morau',           level:'N4', tag_zh:'请对方为我做〜' },
+  { pat_str:'はずだ|はずです',         name:'〜はずだ',             romaji:'～hazu da',            level:'N3', tag_zh:'理应是〜（推测/确信）' },
+  { pat_str:'そうだ|そうです',         name:'〜そうだ（様態）',     romaji:'～sou da',             level:'N4', tag_zh:'看起来〜（样态）' },
+  { pat_str:'らしい',                  name:'〜らしい',             romaji:'～rashii',             level:'N3', tag_zh:'好像〜（推测/典型）' },
+  { pat_str:'ために',                  name:'〜ために',             romaji:'～tame ni',            level:'N3', tag_zh:'为了〜（目的）' },
+  { pat_str:'なければならない|なければいけない', name:'〜なければならない', romaji:'～nakereba naranai', level:'N4', tag_zh:'必须做〜' },
+  { pat_str:'[るすく]前に',            name:'〜前に',               romaji:'～mae ni',             level:'N4', tag_zh:'在做〜之前' },
+  { pat_str:'た後で|た後',             name:'〜た後で',             romaji:'～ta ato de',          level:'N4', tag_zh:'做完〜之后（事后）' },
+  { pat_str:'ばよかった',              name:'〜ばよかった',         romaji:'～ba yokatta',         level:'N3', tag_zh:'要是...就好了（后悔）' },
+];
+
+/* ─── テキスト解析ロジック ─── */
+function scanText(text, db) {
+  const sentences = text.split(/[。！？\n]+/).map(s => s.trim()).filter(s => s.length > 3);
+  const found = new Map();   // id → { grammar, sentences }
+  const cands = new Map();   // pat_str → { hint, sentences }
+  for (const sent of sentences) {
+    for (const g of db) {
+      const p = toPat(g.pat_str); if (!p || !p.test(sent)) continue;
+      if (!found.has(g.id)) found.set(g.id, { grammar:g, sentences:[] });
+      if (found.get(g.id).sentences.length < 3) found.get(g.id).sentences.push(sent);
+    }
+    for (const hint of GRAMMAR_HINTS) {
+      if (db.some(g => g.name === hint.name)) continue; // already registered
+      const p = toPat(hint.pat_str); if (!p || !p.test(sent)) continue;
+      if (!cands.has(hint.pat_str)) cands.set(hint.pat_str, { hint, sentences:[] });
+      if (cands.get(hint.pat_str).sentences.length < 3) cands.get(hint.pat_str).sentences.push(sent);
+    }
+  }
+  return { found:[...found.values()], cands:[...cands.values()], total: sentences.length };
+}
+
+/* ─── URL fetch via CORS proxy ─── */
+async function fetchPageText(url) {
+  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&t=${Date.now()}`;
+  const res   = await fetch(proxy);
+  const data  = await res.json();
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(data.contents || '', 'text/html');
+  ['script','style','nav','footer','header','aside','form'].forEach(tag =>
+    [...doc.querySelectorAll(tag)].forEach(el => el.remove())
+  );
+  return (doc.body?.innerText || doc.body?.textContent || '').replace(/[ \t]+/g,' ').trim();
+}
+
+/* ─── levels ─── */
+const LEVELS = ['N5','N4','N3','N2','N1'];
+const LEVEL_COLOR = { N5:'bg-blue-100 text-blue-700', N4:'bg-violet-100 text-violet-700',
+  N3:'bg-amber-100 text-amber-700', N2:'bg-rose-100 text-rose-700', N1:'bg-red-100 text-red-700' };
+
+/* ══════════════════════════════════════════════
+   EMPTY FORM TEMPLATE
+   ══════════════════════════════════════════════ */
+const EMPTY_FORM = {
+  id:'', pat_str:'', name:'', romaji:'', level:'N4',
+  tag_zh:'', summary_zh:'', conj_rule:'', conj_ex:'', detail_zh:'',
+  examples:[{ja:'',zh:''},{ja:'',zh:''}],
+  quiz:{ q_ja:'', q_zh:'', opts:[{id:'A',text:'',correct:true},{id:'B',text:'',correct:false}],
+    ok_msg:'', ng_msg:'' },
+};
+
+/* ══════════════════════════════════════════════
+   APP
+   ══════════════════════════════════════════════ */
+function App() {
+  const [db, setDb]           = useState(loadDB);
+  const [screen, setScreen]   = useState('input');
+  const [input, setInput]     = useState('');
+  const [grammar, setGrammar] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [result, setResult]   = useState(null);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [toast, setToast]     = useState(null);  // { msg, dying }
+  const [log, setLog]         = useState({ sessionId:`s_${Date.now()}`,timestamp:'',userInput:'',detectedGrammarId:'',detectedGrammarName:'',quizAttempted:false,quizResult:null,quizOptionSelected:null,timeSpentSeconds:0 });
+  const t0 = useRef(Date.now());
+  const toastTimer = useRef(null);
+
+  const updateDB = useCallback((newDB) => {
+    setDb(newDB);
+    saveDB(newDB);
+  }, []);
+
+  const showToast = useCallback((msg) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, dying: false });
+    toastTimer.current = setTimeout(() => setToast(t => t ? {...t, dying:true} : null), 2500);
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const analyze = () => {
+    if (!input.trim()) return;
+    t0.current = Date.now();
+    setScreen('loading');
+    setTimeout(() => {
+      const g = detect(input, db);
+      setGrammar(g); setSelected(null); setResult(null);
+      setLog({ sessionId:`s_${Date.now()}`, timestamp:new Date().toISOString(),
+        userInput:input, detectedGrammarId:g.id, detectedGrammarName:g.name,
+        quizAttempted:false, quizResult:null, quizOptionSelected:null, timeSpentSeconds:0 });
+      setScreen('analysis');
+    }, 2200);
+  };
+
+  const pick = (opt) => {
+    if (selected) return;
+    const r = opt.correct ? 'ok' : 'ng';
+    const timeSpent = Math.round((Date.now()-t0.current)/1000);
+    setSelected(opt.id); setResult(r);
+    setLog(prev => {
+      const updated = {...prev, quizAttempted:true, quizResult:r,
+        quizOptionSelected:opt.id, timeSpentSeconds:timeSpent,
+        level: grammar?.level || '',
+        lessonNumbers: LESSON_MAP[grammar?.id] || []};
+      appendLog(updated);   // ← 永続ログに自動保存
+      return updated;
+    });
+  };
+
+  const reset = () => {
+    setInput(''); setGrammar(null); setSelected(null); setResult(null);
+    setLog({ sessionId:`s_${Date.now()}`,timestamp:'',userInput:'',detectedGrammarId:'',detectedGrammarName:'',quizAttempted:false,quizResult:null,quizOptionSelected:null,timeSpentSeconds:0 });
+    setScreen('input');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-rose-50 to-sky-50 pb-20">
+      {/* ══ Header ══ */}
+      <header className="sticky top-0 z-10 bg-white/75 backdrop-blur-md border-b border-purple-100 px-4 py-3 shadow-sm">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">👨‍🏫</span>
+            <span className="font-black text-purple-700 text-lg tracking-tight">AI先生</span>
+            {/* ナレッジバッジ */}
+            <span className="badge-pulse ml-1 flex items-center gap-1 bg-purple-100 text-purple-600 text-xs font-bold px-2.5 py-1 rounded-full cursor-pointer hover:bg-purple-200 transition-colors"
+              onClick={() => setShowAdmin(true)}>
+              📚 {db.length}件
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {screen !== 'input' && (
+              <button onClick={reset} className="text-sm text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-full transition-colors font-medium">
+                ← やり直す
+              </button>
+            )}
+            <button onClick={() => setShowAdmin(true)}
+              className="text-sm text-white bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 px-3 py-1 rounded-full font-bold transition-all shadow-sm hover:shadow-md">
+              ＋ 学習追加
+            </button>
+          </div>
+        </div>
+        {/* ナレッジバー */}
+        <div className="max-w-lg mx-auto mt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-purple-400 whitespace-nowrap">知識レベル</span>
+            <div className="flex-1 h-1.5 bg-purple-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-violet-400 to-pink-400 rounded-full transition-all duration-700"
+                style={{width:`${Math.min(100, (db.length / 30) * 100)}%`}} />
+            </div>
+            <span className="text-xs text-purple-400 whitespace-nowrap">{db.length}/30</span>
+          </div>
+        </div>
+      </header>
+
+      {/* ══ Main ══ */}
+      <main className="max-w-lg mx-auto px-4 pt-6">
+        {screen==='input'    && <InputScreen input={input} setInput={setInput} analyze={analyze} />}
+        {screen==='loading'  && <LoadingScreen inputText={input} />}
+        {screen==='analysis' && grammar && <AnalysisScreen grammar={grammar} onQuiz={()=>setScreen('quiz')} />}
+        {screen==='quiz'     && grammar && <QuizScreen grammar={grammar} selected={selected} result={result} pick={pick} reset={reset} log={log} />}
+      </main>
+
+      {/* ══ Admin Panel ══ */}
+      {showAdmin && (
+        <AdminPanel db={db} updateDB={updateDB} onClose={()=>setShowAdmin(false)} showToast={showToast} />
+      )}
+
+      {/* ══ 成長トースト ══ */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-gradient-to-r from-violet-500 to-pink-500 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-xl ${toast.dying ? 'toast-out' : 'toast-in'}`}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   ADMIN PANEL — メインコンテナ
+   ══════════════════════════════════════════════ */
+function AdminPanel({ db, updateDB, onClose, showToast }) {
+  const [tab,      setTab]      = useState('list');  // list | add | io
+  const [editItem, setEditItem] = useState(null);
+  const [addMode,  setAddMode]  = useState(null);    // null | form | text | url
+  const [prepop,   setPrepop]   = useState(null);    // pre-populated form data
+
+  const switchTab = (t) => { setTab(t); setEditItem(null); setAddMode(null); setPrepop(null); };
+
+  const handleAdd = (entry) => {
+    const newDB = [...db, entry];
+    updateDB(newDB);
+    showToast(`🎉 AI先生が成長しました！ 「${entry.name}」を習得 → ${newDB.length}件`);
+    setAddMode(null); setPrepop(null); setTab('list');
+  };
+
+  const handleEdit = (entry) => {
+    const newDB = db.map(g => g.id === entry.id ? entry : g);
+    updateDB(newDB);
+    showToast(`✅ 「${entry.name}」を更新しました`);
+    setEditItem(null); setAddMode(null); setTab('list');
+  };
+
+  const handleFillForm = (partial) => { setPrepop(partial); setAddMode('form'); };
+
+  const handleDelete = (id) => {
+    const g = db.find(x => x.id === id);
+    if (!window.confirm(`「${g?.name}」を削除しますか？`)) return;
+    updateDB(db.filter(x => x.id !== id));
+    showToast(`🗑 削除しました`);
+  };
+
+  const handleImport = (items) => {
+    const merged = [...db, ...items.filter(n => !db.find(o => o.id === n.id))];
+    updateDB(merged);
+    showToast(`📥 ${items.length}件インポート → 合計${merged.length}件`);
+    setTab('list');
+  };
+
+  const handleReset = () => {
+    if (!window.confirm('初期データに戻しますか？追加したナレッジは消えます。')) return;
+    updateDB(SEED_DB);
+    showToast('🔄 ナレッジをリセットしました');
+  };
+
+  return (
+    <>
+      <div className="admin-overlay" onClick={onClose} />
+      <div className="admin-panel slide-in shadow-2xl">
+        {/* ─ Panel Header ─ */}
+        <div className="sticky top-0 z-10 bg-white border-b border-purple-100 px-4 pt-4 pb-0">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-black text-purple-700 text-lg flex items-center gap-2">
+                📚 ナレッジ管理
+              </h2>
+              <p className="text-xs text-gray-400">知识管理 · 现有 <strong className="text-purple-600">{db.length}</strong> 件文法</p>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 w-8 h-8 rounded-full text-lg font-bold transition-colors">✕</button>
+          </div>
+          {/* Tabs */}
+          <div className="flex gap-0">
+            {[['list','📋 一覧'],['add','➕ 追加'],['io','📦 IO'],['resources','🎧 教材'],['context','📖 背景']].map(([key,label]) => (
+              <button key={key} onClick={() => switchTab(key)}
+                className={`flex-1 py-2 text-sm font-bold border-b-2 transition-colors ${tab===key ? 'border-purple-500 text-purple-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ─ Tab Content ─ */}
+        <div className="p-4">
+          {/* 一覧タブ */}
+          {tab==='list' && !editItem && <GrammarList db={db} onEdit={item=>{setEditItem(item);setTab('add');setAddMode('form')}} onDelete={handleDelete} />}
+
+          {/* 追加タブ：ソース選択 → 各モード */}
+          {tab==='add' && !editItem && !addMode && (
+            <SourceSelector onSelect={setAddMode} />
+          )}
+          {tab==='add' && !editItem && addMode==='form' && (
+            <GrammarForm mode="add" initial={prepop} onSave={handleAdd} onCancel={()=>{setAddMode(null);setPrepop(null)}} />
+          )}
+          {tab==='add' && !editItem && addMode==='audio' && (
+            <AudioTranscribePanel db={db} onFillForm={handleFillForm} onBack={()=>setAddMode(null)} />
+          )}
+          {tab==='add' && !editItem && addMode==='text' && (
+            <TextAnalyzePanel db={db} onFillForm={handleFillForm} onBack={()=>setAddMode(null)} />
+          )}
+          {tab==='add' && !editItem && addMode==='url' && (
+            <URLFetchPanel db={db} onFillForm={handleFillForm} onBack={()=>setAddMode(null)} />
+          )}
+          {tab==='add' && !editItem && addMode==='upload' && (
+            <FileUploadPanel db={db} onFillForm={handleFillForm} onBulkImport={handleImport} onBack={()=>setAddMode(null)} showToast={showToast} />
+          )}
+          {/* 編集モード */}
+          {tab==='add' && editItem && (
+            <GrammarForm mode="edit" initial={editItem} onSave={handleEdit} onCancel={()=>{setEditItem(null);setAddMode(null);setTab('list')}} />
+          )}
+
+          {/* 入出力タブ */}
+          {tab==='io' && <IOPanel db={db} onImport={handleImport} onReset={handleReset} />}
+
+          {/* 教材リソースタブ */}
+          {tab==='resources' && <ResourcesPanel onStartLoop={() => { switchTab('add'); setAddMode('audio'); }} />}
+
+          {/* 背景情報タブ */}
+          {tab==='context' && <BackgroundPanel />}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   GRAMMAR LIST
+   ══════════════════════════════════════════════ */
+function GrammarList({ db, onEdit, onDelete }) {
+  const sorted = [...db].sort((a,b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level));
+  return (
+    <div className="space-y-3">
+      {sorted.map(g => (
+        <div key={g.id} className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLOR[g.level] || 'bg-gray-100 text-gray-600'}`}>{g.level}</span>
+                <span className="font-black text-purple-700 text-base">{g.name}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{g.romaji}</p>
+              <p className="text-sm text-gray-600 mt-1 line-clamp-1">{g.tag_zh}</p>
+              <p className="text-xs text-gray-300 mt-1 font-mono">/{g.pat_str}/</p>
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <button onClick={()=>onEdit(g)} className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2.5 py-1 rounded-lg font-medium transition-colors">編集</button>
+              <button onClick={()=>onDelete(g.id)} className="text-xs bg-rose-50 text-rose-500 hover:bg-rose-100 px-2.5 py-1 rounded-lg font-medium transition-colors">削除</button>
+            </div>
+          </div>
+        </div>
+      ))}
+      {db.length === 0 && (
+        <div className="text-center py-12 text-gray-400">
+          <div className="text-4xl mb-2">📭</div>
+          <p className="text-sm">文法データがありません<br/>「追加」タブから登録してください</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   GRAMMAR FORM（追加 / 編集）
+   ══════════════════════════════════════════════ */
+function GrammarForm({ mode, initial, onSave, onCancel }) {
+  const def = initial || EMPTY_FORM;
+  const [f, setF] = useState({
+    ...def,
+    examples: def.examples?.length >= 2 ? def.examples : [{ja:'',zh:''},{ja:'',zh:''}],
+    quiz: def.quiz || EMPTY_FORM.quiz,
+  });
+  const [patErr, setPatErr] = useState('');
+
+  const set = (key, val) => setF(p => ({...p, [key]: val}));
+  const setEx = (i, k, v) => setF(p => { const ex=[...p.examples]; ex[i]={...ex[i],[k]:v}; return {...p,examples:ex}; });
+  const setQO = (i, k, v) => setF(p => { const opts=[...p.quiz.opts]; opts[i]={...opts[i],[k]:v}; return {...p,quiz:{...p.quiz,opts}}; });
+  const setQ  = (k, v) => setF(p => ({...p, quiz:{...p.quiz,[k]:v}}));
+
+  const save = () => {
+    if (!f.name.trim())    return alert('文法名を入力してください');
+    if (!f.pat_str.trim()) return alert('検出パターンを入力してください');
+    const p = toPat(f.pat_str);
+    if (!p) { setPatErr('無効な正規表現です'); return; }
+    setPatErr('');
+    if (!f.tag_zh.trim())  return alert('中国語タグを入力してください');
+    onSave({ ...f, id: f.id || uid() });
+  };
+
+  const LBL = ({ch}) => <label className="form-label">{ch}</label>;
+  const INP = ({fld, ph, ...rest}) => (
+    <input className="form-input" placeholder={ph||''} value={f[fld]||''} onChange={e=>set(fld,e.target.value)} {...rest} />
+  );
+  const SEL = ({fld, opts}) => (
+    <select className="form-input" value={f[fld]} onChange={e=>set(fld,e.target.value)}>
+      {opts.map(o=><option key={o}>{o}</option>)}
+    </select>
+  );
+  const TA = ({fld, rows=3, ph}) => (
+    <textarea className="form-input" rows={rows} placeholder={ph||''} value={f[fld]||''} onChange={e=>set(fld,e.target.value)} />
+  );
+
+  return (
+    <div className="space-y-5 pb-10">
+      <div className="text-sm font-bold text-purple-600 bg-purple-50 rounded-xl px-3 py-2">
+        {mode==='add' ? '➕ 新しい文法を追加' : `✏️ 編集中: ${f.name}`}
+      </div>
+
+      {/* ── 基本情報 ── */}
+      <Section title="① 基本情報 / 基本信息">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><LBL ch="文法名（例: 〜てみたい）" /><INP fld="name" ph="〜てみたい" /></div>
+          <div><LBL ch="ローマ字" /><INP fld="romaji" ph="～te mitai" /></div>
+          <div><LBL ch="レベル" /><SEL fld="level" opts={LEVELS} /></div>
+          <div className="col-span-2">
+            <LBL ch="検出パターン（正規表現）" />
+            <INP fld="pat_str" ph="[てで]みたい" />
+            {patErr && <p className="text-xs text-rose-500 mt-1">{patErr}</p>}
+            <p className="text-xs text-gray-400 mt-1">テキスト内のこのパターンを検出すると本文法が選ばれます</p>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── 中国語解説 ── */}
+      <Section title="② 中国語解説 / 中文解说">
+        <div className="space-y-3">
+          <div><LBL ch="タグ（短い意味）" /><INP fld="tag_zh" ph="想试着做〜" /></div>
+          <div><LBL ch="概要（1〜2文）" /><INP fld="summary_zh" ph="表达想要尝试某件事的愿望..." /></div>
+          <div><LBL ch="接続ルール" /><INP fld="conj_rule" ph="动词て形 ＋ みたい" /></div>
+          <div><LBL ch="接続例" /><INP fld="conj_ex" ph="食べる → 食べてみたい" /></div>
+          <div><LBL ch="詳細説明（中国語）" /><TA fld="detail_zh" rows={4} ph="「みたい」来自「みる（试试看）」..." /></div>
+        </div>
+      </Section>
+
+      {/* ── 例文 ── */}
+      <Section title="③ 例文 / 例句">
+        {[0,1].map(i => (
+          <div key={i} className="bg-amber-50 rounded-xl p-3 mb-2 space-y-2">
+            <p className="text-xs font-bold text-amber-600">例文 {i+1}</p>
+            <div>
+              <LBL ch="日本語" />
+              <input className="form-input" placeholder="日本料理を作ってみたい。" value={f.examples[i]?.ja||''} onChange={e=>setEx(i,'ja',e.target.value)} />
+            </div>
+            <div>
+              <LBL ch="中国語訳" />
+              <input className="form-input" placeholder="想试着做日本料理。" value={f.examples[i]?.zh||''} onChange={e=>setEx(i,'zh',e.target.value)} />
+            </div>
+          </div>
+        ))}
+      </Section>
+
+      {/* ── クイズ ── */}
+      <Section title="④ クイズ / 测验">
+        <div className="space-y-3">
+          <div><LBL ch="問題文（日本語）穴は（　　）で表記" /><INP fld="" ph="富士山に（　　）みたいです。" value={f.quiz.q_ja} onChange={e=>setQ('q_ja',e.target.value)} /></div>
+          <div><LBL ch="問題文（中国語ヒント）" /><INP fld="" ph="我想试着攀登富士山。括号里该填什么？" value={f.quiz.q_zh} onChange={e=>setQ('q_zh',e.target.value)} /></div>
+          {[0,1].map(i => (
+            <div key={i} className="bg-indigo-50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-indigo-400">{f.quiz.opts[i]?.id||['A','B'][i]}</span>
+                <input className="form-input flex-1" placeholder={i===0?'登って':'登り'} value={f.quiz.opts[i]?.text||''} onChange={e=>setQO(i,'text',e.target.value)} />
+                <label className="flex items-center gap-1 text-xs font-bold text-emerald-600 whitespace-nowrap cursor-pointer">
+                  <input type="radio" name="correct" checked={f.quiz.opts[i]?.correct===true} onChange={()=>setF(p=>({...p,quiz:{...p.quiz,opts:p.quiz.opts.map((o,j)=>({...o,correct:j===i}))}}))} />
+                  正解
+                </label>
+              </div>
+            </div>
+          ))}
+          <div><LBL ch="正解時のメッセージ" /><INP fld="" ph="「登る」のて形は「登って」 ✅" value={f.quiz.ok_msg} onChange={e=>setQ('ok_msg',e.target.value)} /></div>
+          <div><LBL ch="不正解時のメッセージ" /><INP fld="" ph="「登り」はます形です..." value={f.quiz.ng_msg} onChange={e=>setQ('ng_msg',e.target.value)} /></div>
+        </div>
+      </Section>
+
+      {/* ── ボタン ── */}
+      <div className="flex gap-3 pt-2">
+        <button onClick={onCancel} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-2xl transition-colors">キャンセル</button>
+        <button onClick={save} className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-bold py-3 rounded-2xl transition-all shadow-md">
+          {mode==='add' ? '🧠 食べさせる（追加）' : '✅ 更新する'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Section wrapper ── */
+function Section({ title, children }) {
+  return (
+    <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
+      <p className="text-xs font-black text-purple-600 mb-3 border-b border-purple-100 pb-2">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   IO PANEL — レッスンログ / 宿題 / Google連携 / データ管理
+   ══════════════════════════════════════════════ */
+function IOPanel({ db, onImport, onReset }) {
+  const [sub, setSub] = React.useState('log'); // log | hw | sheets | data
+
+  return (
+    <div className="space-y-3">
+      {/* サブナビ */}
+      <div className="grid grid-cols-4 gap-1 bg-gray-100 rounded-xl p-1">
+        {[['log','📋 ログ'],['hw','🏠 宿題'],['sheets','📊 Sheets'],['data','💾 データ']].map(([k,l])=>(
+          <button key={k} onClick={()=>setSub(k)}
+            className={`text-xs font-bold py-2 rounded-lg transition-colors ${sub===k ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {sub === 'log'    && <LessonLogPanel />}
+      {sub === 'hw'     && <HomeworkPanel />}
+      {sub === 'sheets' && <SheetsPanel db={db} />}
+      {sub === 'data'   && <ImportExport db={db} onImport={onImport} onReset={onReset} />}
+    </div>
+  );
+}
+
+/* ─── レッスンログ ─── */
+function LessonLogPanel() {
+  const [logs, setLogs] = React.useState(() => loadLogs());
+
+  const clearLogs = () => {
+    if (!window.confirm('ログを全件削除しますか？')) return;
+    saveLogs([]); setLogs([]);
+  };
+  const exportCSV = () => {
+    if (!logs.length) return alert('ログがありません');
+    downloadCSV(toCSV(logs), `ai_sensei_log_${new Date().toISOString().slice(0,10)}.csv`);
+  };
+  const refresh = () => setLogs(loadLogs());
+
+  const fmtDate = (s) => {
+    if (!s) return '—';
+    try { return new Date(s).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return s; }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-gray-700">📋 レッスンログ</p>
+          <p className="text-xs text-gray-400">{logs.length}件 — クイズ回答時に自動記録</p>
+        </div>
+        <div className="flex gap-1.5">
+          <button onClick={refresh} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg font-bold transition-colors">↻ 更新</button>
+          <button onClick={exportCSV} className="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg font-bold transition-colors">CSV↓</button>
+          {logs.length > 0 && <button onClick={clearLogs} className="text-xs bg-rose-100 hover:bg-rose-200 text-rose-600 px-2.5 py-1.5 rounded-lg font-bold transition-colors">削除</button>}
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+          <p className="text-3xl mb-2">📋</p>
+          <p className="text-xs text-gray-400">まだログがありません。<br/>クイズを解くと自動的に記録されます。</p>
+        </div>
+      ) : (
+        <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+          {logs.slice(0,80).map((r,i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 px-3 py-2.5 flex items-center gap-2 shadow-sm">
+              <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${r.quizResult==='ok' ? 'bg-emerald-100 text-emerald-600' : r.quizResult==='ng' ? 'bg-rose-100 text-rose-500' : 'bg-gray-100 text-gray-400'}`}>
+                {r.quizResult==='ok' ? '✓' : r.quizResult==='ng' ? '✗' : '—'}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-gray-700 truncate">{r.detectedGrammarName || '—'}</p>
+                <p className="text-xs text-gray-400 truncate">{r.userInput || '—'}</p>
+              </div>
+              <div className="text-right shrink-0">
+                {(r.lessonNumbers||[]).length > 0 && (
+                  <span className="text-xs bg-indigo-50 text-indigo-500 font-bold px-1.5 py-0.5 rounded-full">第{r.lessonNumbers[0]}回</span>
+                )}
+                <p className="text-xs text-gray-300 mt-0.5">{fmtDate(r.savedAt||r.timestamp)}</p>
+              </div>
+            </div>
+          ))}
+          {logs.length > 80 && <p className="text-xs text-center text-gray-300 py-1">残り{logs.length-80}件 — CSVでエクスポートして確認</p>}
+        </div>
+      )}
+
+      {/* 簡易統計 */}
+      {logs.length > 0 && (() => {
+        const ok = logs.filter(r=>r.quizResult==='ok').length;
+        const ng = logs.filter(r=>r.quizResult==='ng').length;
+        const pct = ok+ng > 0 ? Math.round(ok/(ok+ng)*100) : 0;
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            {[['✅ 正解', ok, 'bg-emerald-50 text-emerald-700'],['❌ 不正解', ng, 'bg-rose-50 text-rose-600'],['🎯 正答率', pct+'%', 'bg-indigo-50 text-indigo-700']].map(([l,v,c])=>(
+              <div key={l} className={`rounded-xl p-3 text-center ${c}`}>
+                <p className="text-lg font-black">{v}</p>
+                <p className="text-xs font-bold">{l}</p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ─── 宿題チェックリスト ─── */
+function HomeworkPanel() {
+  const [hw, setHW] = React.useState(() => loadHW());
+  // hw: { '1': { done:true, doneAt:'2024/01/15', note:'録音できた' }, ... }
+
+  const toggle = (n) => {
+    const prev = hw[n] || {};
+    const updated = {...hw, [n]: prev.done
+      ? {...prev, done:false, doneAt:''}
+      : {...prev, done:true, doneAt:new Date().toLocaleDateString('ja-JP')}
+    };
+    setHW(updated); saveHW(updated);
+  };
+  const setNote = (n, note) => {
+    const updated = {...hw, [n]: {...(hw[n]||{}), note}};
+    setHW(updated); saveHW(updated);
+  };
+
+  const doneCount = CURRICULUM_CONTEXT.filter(l => hw[l.lesson]?.done).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-gray-700">🏠 宿題チェックリスト</p>
+          <p className="text-xs text-gray-400">{doneCount} / {CURRICULUM_CONTEXT.length} 回 完了</p>
+        </div>
+        {/* 進捗バー */}
+        <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-500"
+            style={{width:`${Math.round(doneCount/CURRICULUM_CONTEXT.length*100)}%`}} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {CURRICULUM_CONTEXT.map(les => {
+          const entry = hw[les.lesson] || {};
+          const done = !!entry.done;
+          return (
+            <div key={les.lesson} className={`rounded-2xl border transition-colors ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-100'}`}>
+              <div className="flex items-start gap-3 px-3 py-3">
+                <button onClick={() => toggle(les.lesson)}
+                  className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 hover:border-emerald-400'}`}>
+                  {done && <span className="text-sm font-black">✓</span>}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-black w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 ${les.lesson <= 4 ? 'bg-blue-400' : 'bg-orange-400'}`}>{les.lesson}</span>
+                    <span className={`text-xs font-bold ${done ? 'text-emerald-700' : 'text-gray-700'}`}>{les.titleJa}</span>
+                    <span className="text-xs text-gray-400">{les.week}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{les.hw}</p>
+                  {done && entry.doneAt && (
+                    <p className="text-xs text-emerald-500 mt-0.5">✅ {entry.doneAt} 完了</p>
+                  )}
+                  {/* メモ入力 */}
+                  <input
+                    type="text"
+                    placeholder="メモを追加（任意）"
+                    value={entry.note || ''}
+                    onChange={e => setNote(les.lesson, e.target.value)}
+                    className="mt-1.5 w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-purple-300 bg-white/80"
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Google Sheets 連携 ─── */
+const GAS_TEMPLATE = `// ① Googleスプレッドシートを開く → 拡張機能 → Apps Script
+// ② 以下をそのまま貼り付けてデプロイ（ウェブアプリ/全員に公開）
+// ③ デプロイURLをこのアプリに貼る
+
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var payload = JSON.parse(e.postData.contents);
+
+    if (payload.type === 'lesson_log') {
+      var s = ss.getSheetByName('レッスンログ') || ss.insertSheet('レッスンログ');
+      if (!s.getLastRow()) s.appendRow(['日時','入力文','文法','レベル','クイズ','結果','時間(秒)','学習回']);
+      payload.records.forEach(function(r) {
+        s.appendRow([r.timestamp,r.userInput,r.detectedGrammarName,r.level||'',r.quizAttempted?'○':'',r.quizResult||'',r.timeSpentSeconds||0,(r.lessonNumbers||[]).join('・')]);
+      });
+    } else if (payload.type === 'homework') {
+      var h = ss.getSheetByName('宿題') || ss.insertSheet('宿題');
+      if (!h.getLastRow()) h.appendRow(['回','テーマ','宿題内容','完了','完了日','メモ']);
+      payload.records.forEach(function(r) {
+        h.appendRow([r.lesson,r.theme,r.hw,r.done?'✅':'',r.doneAt||'',r.note||'']);
+      });
+    } else if (payload.type === 'knowledge_db') {
+      var k = ss.getSheetByName('ナレッジ') || ss.insertSheet('ナレッジ');
+      k.clearContents();
+      k.appendRow(['ID','文法名','ローマ字','レベル','タグ','概要']);
+      payload.records.forEach(function(r) {
+        k.appendRow([r.id,r.name,r.romaji,r.level,r.tag_zh,r.summary_zh]);
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({status:'error',msg:err.message}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+
+function SheetsPanel({ db }) {
+  const [url,     setUrl]     = React.useState(() => loadGasUrl());
+  const [status,  setStatus]  = React.useState('');  // '' | 'sending' | 'ok' | 'err'
+  const [gasOpen, setGasOpen] = React.useState(false);
+
+  const saveUrl = (v) => { setUrl(v); saveGasUrl(v); };
+
+  const send = async (type, label) => {
+    if (!url.trim()) { setStatus('err_no_url'); return; }
+    setStatus('sending');
+    try {
+      let records;
+      if (type === 'lesson_log') records = loadLogs();
+      else if (type === 'homework') {
+        const hw = loadHW();
+        records = CURRICULUM_CONTEXT.map(l => ({
+          lesson: l.lesson, theme: l.titleJa, hw: l.hw,
+          done: !!(hw[l.lesson]?.done), doneAt: hw[l.lesson]?.doneAt||'', note: hw[l.lesson]?.note||''
+        }));
+      } else if (type === 'knowledge_db') records = db;
+
+      await fetch(url, { method:'POST', body: JSON.stringify({type, records}) });
+      setStatus('ok_' + label);
+      setTimeout(() => setStatus(''), 4000);
+    } catch(e) {
+      setStatus('err_' + e.message);
+    }
+  };
+
+  const copyGas = () => {
+    navigator.clipboard?.writeText(GAS_TEMPLATE)
+      .then(() => { setStatus('copied'); setTimeout(()=>setStatus(''),2500); });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-black text-gray-700 mb-1">📊 Google Sheets 連携</p>
+        <p className="text-xs text-gray-400">レッスンログ・宿題・ナレッジDBをスプレッドシートに送信します</p>
+      </div>
+
+      {/* GAS URL 入力 */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <label className="block text-xs font-black text-gray-600 mb-2">🔗 GAS Web App URL</label>
+        <input type="url" value={url} onChange={e=>saveUrl(e.target.value)}
+          placeholder="https://script.google.com/macros/s/…/exec"
+          className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-purple-300" />
+        {status === 'err_no_url' && <p className="text-xs text-rose-500 mt-1">URLを入力してください</p>}
+        {url && !url.includes('script.google.com') && <p className="text-xs text-amber-500 mt-1">⚠️ Google Apps ScriptのURLを入力してください</p>}
+      </div>
+
+      {/* 送信ボタン */}
+      <div className="grid grid-cols-1 gap-2">
+        {[
+          { type:'lesson_log',   icon:'📋', label:'レッスンログを送信',   sub:`${loadLogs().length}件`, color:'from-indigo-500 to-blue-500' },
+          { type:'homework',     icon:'🏠', label:'宿題状況を送信',       sub:`${CURRICULUM_CONTEXT.filter(l=>loadHW()[l.lesson]?.done).length}/${CURRICULUM_CONTEXT.length}回`, color:'from-emerald-500 to-teal-500' },
+          { type:'knowledge_db', icon:'📚', label:'ナレッジDBを送信',     sub:`${db.length}件`, color:'from-violet-500 to-purple-500' },
+        ].map(s => (
+          <button key={s.type} onClick={() => send(s.type, s.label)}
+            disabled={status==='sending' || !url.trim()}
+            className={`flex items-center gap-3 bg-gradient-to-r ${s.color} hover:opacity-90 disabled:opacity-40 text-white rounded-xl px-4 py-3 transition-all shadow-sm active:scale-[.97]`}>
+            <span className="text-xl">{s.icon}</span>
+            <div className="text-left flex-1">
+              <p className="text-sm font-black">{s.label}</p>
+              <p className="text-white/70 text-xs">{s.sub}</p>
+            </div>
+            <span className="text-white/60 text-sm">↑</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ステータス */}
+      {status && !status.startsWith('err_no_url') && (
+        <div className={`rounded-xl px-4 py-3 text-xs font-bold text-center ${
+          status==='sending' ? 'bg-blue-50 text-blue-600' :
+          status.startsWith('ok') ? 'bg-emerald-50 text-emerald-600' :
+          status==='copied' ? 'bg-purple-50 text-purple-600' :
+          'bg-rose-50 text-rose-600'
+        }`}>
+          {status==='sending' ? '送信中...' :
+           status.startsWith('ok_') ? `✅ ${status.slice(3)} — スプレッドシートをご確認ください` :
+           status==='copied' ? '✅ GASコードをコピーしました！Apps Scriptに貼り付けてください' :
+           `⚠️ ${status.replace('err_','')}`}
+        </div>
+      )}
+
+      {/* GASセットアップガイド */}
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+        <button onClick={()=>setGasOpen(o=>!o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors">
+          <span>⚙️ GASのセットアップ方法（初回のみ）</span>
+          <span>{gasOpen ? '▲' : '▼'}</span>
+        </button>
+        {gasOpen && (
+          <div className="px-4 pb-4 space-y-3 border-t border-gray-200">
+            <ol className="text-xs text-gray-600 space-y-2 mt-3">
+              {[
+                'Googleスプレッドシートを新規作成',
+                '上部メニュー「拡張機能」→「Apps Script」を開く',
+                '下の「GASコードをコピー」ボタンでコードをコピーして貼り付け',
+                '「デプロイ」→「新しいデプロイ」→ 種類: ウェブアプリ',
+                '実行するユーザー: 自分 / アクセスできるユーザー: 全員',
+                '「デプロイ」をクリック → 表示されたURLをここに貼る',
+              ].map((s,i)=>(
+                <li key={i} className="flex gap-2">
+                  <span className="shrink-0 w-5 h-5 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-black text-xs">{i+1}</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ol>
+            <button onClick={copyGas}
+              className="w-full bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-xl transition-colors">
+              📋 GASコードをコピー
+            </button>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-gray-400 hover:text-gray-600">コードを確認する</summary>
+              <pre className="mt-2 bg-gray-900 text-green-400 rounded-xl p-3 overflow-x-auto text-xs leading-relaxed whitespace-pre-wrap">{GAS_TEMPLATE}</pre>
+            </details>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   IMPORT / EXPORT
+   ══════════════════════════════════════════════ */
+function ImportExport({ db, onImport, onReset }) {
+  const [jsonText, setJsonText] = useState('');
+  const [err, setErr]           = useState('');
+
+  const doImport = () => {
+    try {
+      const data = JSON.parse(jsonText);
+      const arr = Array.isArray(data) ? data : [data];
+      if (!arr[0]?.name) { setErr('nameフィールドが必要です'); return; }
+      setErr('');
+      onImport(arr);
+      setJsonText('');
+    } catch(e) { setErr('JSONの形式が正しくありません: ' + e.message); }
+  };
+
+  const doExport = () => {
+    const json = JSON.stringify(db, null, 2);
+    setJsonText(json);
+  };
+
+  const doCopy = () => {
+    navigator.clipboard?.writeText(jsonText).then(() => alert('コピーしました！'));
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Export */}
+      <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
+        <p className="text-xs font-black text-purple-600 mb-3">📤 エクスポート / 导出</p>
+        <p className="text-xs text-gray-400 mb-3">現在のナレッジをJSONで書き出します。バックアップや共有に使えます。</p>
+        <div className="flex gap-2">
+          <button onClick={doExport} className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2.5 rounded-xl text-sm transition-colors">JSONを生成</button>
+          {jsonText && <button onClick={doCopy} className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-colors">コピー</button>}
+        </div>
+      </div>
+
+      {/* Import */}
+      <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
+        <p className="text-xs font-black text-purple-600 mb-3">📥 インポート / 导入</p>
+        <p className="text-xs text-gray-400 mb-3">JSON配列を貼り付けてインポートします。既存と同じIDの項目はスキップされます。</p>
+        <textarea className="form-input mb-2" rows={8} placeholder={'[\n  {\n    "name": "〜てしまう",\n    "pat_str": "[てで]しまう",\n    ...\n  }\n]'}
+          value={jsonText} onChange={e=>{ setJsonText(e.target.value); setErr(''); }} />
+        {err && <p className="text-xs text-rose-500 mb-2">{err}</p>}
+        <button onClick={doImport} disabled={!jsonText.trim()}
+          className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 disabled:opacity-40 text-white font-bold py-3 rounded-2xl transition-all shadow-md text-sm">
+          🧠 ナレッジを食べさせる（インポート）
+        </button>
+      </div>
+
+      {/* Reset */}
+      <div className="bg-rose-50 rounded-2xl border border-rose-100 p-4">
+        <p className="text-xs font-black text-rose-500 mb-2">⚠️ リセット</p>
+        <p className="text-xs text-gray-400 mb-3">ナレッジを初期16件（N5〜N4基礎）に戻します。追加データは失われます。</p>
+        <button onClick={onReset} className="w-full bg-rose-100 hover:bg-rose-200 text-rose-600 font-bold py-2.5 rounded-xl text-sm transition-colors">
+          初期データに戻す
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SOURCE SELECTOR — 追加方法を選ぶ
+   ══════════════════════════════════════════════ */
+function SourceSelector({ onSelect }) {
+  const sources = [
+    { id:'form',  icon:'📝', label:'手入力',         sub:'フォームに直接入力',         color:'from-violet-400 to-purple-500' },
+    { id:'audio', icon:'🎤', label:'音声文字起こし',  sub:'音声→テキスト→文法自動抽出', color:'from-pink-400 to-rose-500'    },
+    { id:'text',  icon:'📄', label:'テキスト解析',   sub:'テキストを貼って自動検出',    color:'from-blue-400 to-indigo-500'  },
+    { id:'url',    icon:'🌐', label:'URL取得',        sub:'WebサイトからAI抽出',        color:'from-emerald-400 to-teal-500' },
+    { id:'upload', icon:'📂', label:'フォルダAL',     sub:'ファイルをアップロードして取込', color:'from-orange-400 to-amber-500'  },
+  ];
+  return (
+    <div className="fiu space-y-4">
+      <div className="text-center py-4">
+        <div className="text-4xl mb-2">🧠</div>
+        <h3 className="font-black text-purple-700 text-lg">どうやって食べさせる？</h3>
+        <p className="text-xs text-gray-400 mt-1">ナレッジの入力方法を選んでください</p>
+      </div>
+      <div className="space-y-3">
+        {sources.map((s,i) => (
+          <button key={s.id} onClick={()=>onSelect(s.id)}
+            className={`fiu${i+1} w-full bg-gradient-to-r ${s.color} text-white rounded-2xl p-4 text-left shadow-md hover:shadow-lg active:scale-[.98] transition-all`}>
+            <div className="flex items-center gap-4">
+              <span className="text-3xl bg-white/20 rounded-xl w-12 h-12 flex items-center justify-center">{s.icon}</span>
+              <div>
+                <p className="font-black text-base">{s.label}</p>
+                <p className="text-white/80 text-xs mt-0.5">{s.sub}</p>
+              </div>
+              <span className="ml-auto text-white/60 text-xl">›</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TEXT ANALYZE PANEL
+   ══════════════════════════════════════════════ */
+function TextAnalyzePanel({ db, onFillForm, onBack }) {
+  const [text,    setText]    = useState('');
+  const [results, setResults] = useState(null);
+  const [scanning,setScanning]= useState(false);
+
+  const doScan = () => {
+    if (!text.trim()) return;
+    setScanning(true);
+    setTimeout(() => { setResults(scanText(text, db)); setScanning(false); }, 600);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-1">
+        <button onClick={onBack} className="text-xs text-purple-500 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-full transition-colors font-bold">← 戻る</button>
+        <span className="text-sm font-black text-blue-700">📄 テキスト解析</span>
+      </div>
+      <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-sm">
+        <label className="form-label">日本語テキストを貼り付けてください</label>
+        <textarea className="form-input" rows={7} placeholder={"例：\n「バスに乗り遅れてしまいました。\n音楽を聴きながら、勉強することができます。\n先生に聞いてみたいことがあります。」"}
+          value={text} onChange={e=>setText(e.target.value)} />
+        <button onClick={doScan} disabled={!text.trim() || scanning}
+          className="w-full mt-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 disabled:opacity-40 text-white font-black py-3 rounded-2xl transition-all shadow-md text-sm">
+          {scanning ? '🔍 解析中...' : '🔍 文法を解析する'}
+        </button>
+      </div>
+
+      {results && <AnalyzeResults results={results} onFillForm={onFillForm} />}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   URL FETCH PANEL
+   ══════════════════════════════════════════════ */
+const SAMPLE_URLS = [
+  'https://www.nhk.or.jp/lesson/ja/',
+  'https://jlptsenseeii.com/n4-grammar/',
+];
+
+/* ══════════════════════════════════════════════
+   DOCX TEXT EXTRACTOR  v2
+   ① EOCD から Central Directory を取得（data descriptor 対応）
+   ② CD エントリで word/document.xml の正確な compSize・offset を特定
+   ③ DecompressionStream('deflate-raw') で解凍、失敗時 'deflate' にフォールバック
+   ④ <w:t> タグからテキスト抽出
+   ══════════════════════════════════════════════ */
+async function extractDocxText(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const view  = new DataView(arrayBuffer);
+
+  /* ─ 1. EOCD を末尾から探す ─ */
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65558); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return null;
+
+  const cdCount  = view.getUint16(eocd + 10, true);
+  const cdOffset = view.getUint32(eocd + 16, true);
+
+  /* ─ 2. Central Directory を走査して word/document.xml を探す ─ */
+  let cdPos = cdOffset;
+  let tMethod = 0, tCompSize = 0, tLocalOff = 0, found = false;
+  for (let i = 0; i < cdCount; i++) {
+    if (view.getUint32(cdPos, true) !== 0x02014b50) break;
+    const method     = view.getUint16(cdPos + 10, true);
+    const compSize   = view.getUint32(cdPos + 20, true);
+    const fnLen      = view.getUint16(cdPos + 28, true);
+    const exLen      = view.getUint16(cdPos + 30, true);
+    const cmLen      = view.getUint16(cdPos + 32, true);
+    const localOff   = view.getUint32(cdPos + 42, true);
+    const fname      = new TextDecoder().decode(bytes.subarray(cdPos + 46, cdPos + 46 + fnLen));
+    if (fname === 'word/document.xml') {
+      tMethod = method; tCompSize = compSize; tLocalOff = localOff; found = true; break;
+    }
+    cdPos += 46 + fnLen + exLen + cmLen;
+  }
+  if (!found) return null;
+
+  /* ─ 3. ローカルヘッダーからデータ開始位置を計算 ─ */
+  if (view.getUint32(tLocalOff, true) !== 0x04034b50) return null;
+  const lFnLen   = view.getUint16(tLocalOff + 26, true);
+  const lExLen   = view.getUint16(tLocalOff + 28, true);
+  const dataStart = tLocalOff + 30 + lFnLen + lExLen;
+  const compData  = bytes.subarray(dataStart, dataStart + tCompSize);
+
+  /* ─ 4. 解凍 ─ */
+  async function decompress(data, format) {
+    const ds = new DecompressionStream(format);
+    const w  = ds.writable.getWriter();
+    const r  = ds.readable.getReader();
+    w.write(data.slice()); w.close();
+    const chunks = []; let done = false;
+    while (!done) { const {value, done:d} = await r.read(); if (value) chunks.push(value); done = d; }
+    const total = chunks.reduce((a, c) => a + c.length, 0);
+    const out = new Uint8Array(total); let pos = 0;
+    for (const c of chunks) { out.set(c, pos); pos += c.length; }
+    return new TextDecoder('utf-8').decode(out);
+  }
+
+  let xmlText = '';
+  if (tMethod === 0) {
+    xmlText = new TextDecoder('utf-8').decode(compData);
+  } else if (tMethod === 8 && typeof DecompressionStream !== 'undefined') {
+    try       { xmlText = await decompress(compData, 'deflate-raw'); }
+    catch (e) {
+      try     { xmlText = await decompress(compData, 'deflate'); }
+      catch   { return null; }
+    }
+  } else { return null; }
+
+  /* ─ 5. <w:t> タグからテキスト抽出 ─ */
+  if (!xmlText) return null;
+  const texts = []; let m;
+  const re = /<w:t[^>]*>([^<]*)<\/w:t>/g;
+  while ((m = re.exec(xmlText)) !== null) if (m[1]) texts.push(m[1]);
+  return texts.join(' ').trim() || null;
+}
+
+/* ── FileReader Promise ラッパー ── */
+function readAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = () => rej(new Error('read error'));
+    r.readAsText(file, 'UTF-8');
+  });
+}
+function readAsArrayBuffer(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = () => rej(new Error('read error'));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+/* ── CSV テキスト → grammar entry 配列 ── */
+function parseCsvToEntries(raw) {
+  const lines  = raw.split('\n').map(l => l.trim()).filter(l => l);
+  if (!lines.length) return [];
+  const header = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+  const rows   = lines.slice(1).map(l => {
+    const vals = l.split(',').map(v => v.replace(/^"|"$/g,'').trim());
+    const obj  = {}; header.forEach((h,i) => { obj[h] = vals[i] || ''; });
+    return obj;
+  }).filter(r => r.name || r['文法名']);
+  return rows.map(r => ({
+    id: r.id || r['ID'] || uid(),
+    name: r.name || r['文法名'] || '',
+    romaji: r.romaji || r['ローマ字'] || '',
+    level: r.level || r['レベル'] || 'N5',
+    pat_str: r.pat_str || r['パターン'] || '',
+    tag_zh: r.tag_zh || r['タグ'] || '',
+    summary_zh: r.summary_zh || r['概要'] || '',
+    conj_rule: r.conj_rule || r['接続'] || '',
+    conj_ex: r.conj_ex || '',
+    detail_zh: r.detail_zh || r['解説'] || '',
+    examples: [{ja:r.ex1_ja||r['例文1']||'',zh:r.ex1_zh||r['例文1訳']||''},{ja:r.ex2_ja||'',zh:r.ex2_zh||''}],
+    quiz: {q_ja:r.q_ja||'',q_zh:r.q_zh||'',opts:[{id:'A',text:r.opt_a||'',correct:true},{id:'B',text:r.opt_b||'',correct:false}],ok_msg:'',ng_msg:''},
+  }));
+}
+
+/* ── 1ファイル処理（フォルダモード用、Promiseを返す） ── */
+async function processOneFile(file, db) {
+  const name = file.name;
+  const ext  = name.split('.').pop().toLowerCase();
+  try {
+    if (ext === 'json') {
+      const raw  = await readAsText(file);
+      const data = JSON.parse(raw);
+      const arr  = Array.isArray(data) ? data : [data];
+      if (!arr[0]?.name && !arr[0]?.id) return {name,ext,type:'error',msg:'name/idフィールドなし'};
+      return {name,ext,type:'entries',entries:arr};
+    }
+    if (ext === 'csv') {
+      const raw     = await readAsText(file);
+      const entries = parseCsvToEntries(raw);
+      if (!entries.length) return {name,ext,type:'error',msg:'name列が見つかりません'};
+      return {name,ext,type:'entries',entries};
+    }
+    if (ext === 'txt' || ext === 'md') {
+      const raw  = await readAsText(file);
+      return {name,ext,type:'scan',scan:scanText(raw,db)};
+    }
+    if (ext === 'docx') {
+      const buf  = await readAsArrayBuffer(file);
+      const text = await extractDocxText(buf);
+      if (!text || text.length < 5) return {name,ext,type:'error',msg:'テキスト抽出失敗'};
+      return {name,ext,type:'scan',scan:scanText(text,db)};
+    }
+    if (ext === 'doc') return {name,ext,type:'legacyDoc'};
+    if (['mp3','m4a','wav','ogg','aac'].includes(ext)) return {name,ext,type:'audio'};
+    return {name,ext,type:'skip'};
+  } catch(e) {
+    return {name,ext,type:'error',msg:e.message};
+  }
+}
+
+/* ── webkitEntry → File[] 再帰取得 ── */
+async function getFilesFromEntry(entry) {
+  if (entry.isFile) {
+    return new Promise(res => entry.file(res, () => res(null)));
+  }
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    const allEntries = await new Promise(res => {
+      const acc = [];
+      function batch() { reader.readEntries(items => { if (!items.length) { res(acc); return; } acc.push(...items); batch(); }); }
+      batch();
+    });
+    const nested = await Promise.all(allEntries.map(getFilesFromEntry));
+    return nested.flat().filter(Boolean);
+  }
+  return [];
+}
+
+/* ══════════════════════════════════════════════
+   FILE UPLOAD PANEL — 📂 フォルダAL
+   対応: JSON / CSV / TXT / DOCX / DOC / 音声 / フォルダ一括
+   ══════════════════════════════════════════════ */
+function FileUploadPanel({ db, onFillForm, onBulkImport, onBack, showToast }) {
+  const [dragging,     setDragging]     = React.useState(false);
+  const [fileInfo,     setFileInfo]     = React.useState(null);
+  const [preview,      setPreview]      = React.useState(null);
+  const [textScan,     setTextScan]     = React.useState(null);
+  const [error,        setError]        = React.useState('');
+  const [loading,      setLoading]      = React.useState(false);
+  // フォルダ一括モード
+  const [folderState,  setFolderState]  = React.useState(null);
+  // null | { phase:'processing'|'done', n:number, total:number, current:string, results:[] }
+  const inputRef       = React.useRef(null);
+  const folderInputRef = React.useRef(null);
+
+  const reset = () => {
+    setFileInfo(null); setPreview(null); setTextScan(null);
+    setError(''); setLoading(false); setFolderState(null);
+  };
+
+  /* ─── ファイル処理 ─── */
+  const processFile = (file) => {
+    setError(''); setPreview(null); setTextScan(null); setLoading(true);
+    const name = file.name;
+    const ext  = name.split('.').pop().toLowerCase();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      setLoading(false);
+
+      if (ext === 'json') {
+        try {
+          const data = JSON.parse(raw);
+          const arr  = Array.isArray(data) ? data : [data];
+          if (!arr[0]?.name && !arr[0]?.id) { setError('nameまたはidフィールドが必要なJSONです'); return; }
+          setFileInfo({ name, ext, size: file.size });
+          setPreview(arr);
+        } catch(e) { setError('JSONパース失敗: ' + e.message); setLoading(false); }
+
+      } else if (ext === 'csv') {
+        const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+        const header = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+        const rows = lines.slice(1).map(l => {
+          // CSV simple parse (no nested quotes)
+          const vals = l.split(',').map(v => v.replace(/^"|"$/g,'').trim());
+          const obj = {};
+          header.forEach((h,i) => { obj[h] = vals[i] || ''; });
+          return obj;
+        }).filter(r => r.name || r['文法名']);
+        if (!rows.length) { setError('name列が見つかりません。ヘッダー行にnameまたは文法名が必要です'); return; }
+        // CSV→grammar entry 変換
+        const entries = rows.map(r => ({
+          id:         r.id         || r['ID']   || uid(),
+          name:       r.name       || r['文法名'] || '',
+          romaji:     r.romaji     || r['ローマ字'] || '',
+          level:      r.level      || r['レベル'] || 'N5',
+          pat_str:    r.pat_str    || r['パターン'] || '',
+          tag_zh:     r.tag_zh     || r['タグ']   || '',
+          summary_zh: r.summary_zh || r['概要']   || '',
+          conj_rule:  r.conj_rule  || r['接続']   || '',
+          conj_ex:    r.conj_ex    || '',
+          detail_zh:  r.detail_zh  || r['解説']   || '',
+          examples:   [ {ja: r.ex1_ja||r['例文1']||'', zh: r.ex1_zh||r['例文1訳']||''}, {ja: r.ex2_ja||'', zh: r.ex2_zh||''} ],
+          quiz:       { q_ja:r.q_ja||'', q_zh:r.q_zh||'', opts:[{id:'A',text:r.opt_a||'',correct:true},{id:'B',text:r.opt_b||'',correct:false}], ok_msg:'', ng_msg:'' },
+        }));
+        setFileInfo({ name, ext, size: file.size });
+        setPreview(entries);
+
+      } else if (ext === 'txt' || ext === 'md') {
+        setFileInfo({ name, ext, size: file.size, rawText: raw });
+        const result = scanText(raw, db);
+        setTextScan(result);
+
+      } else if (['mp3','m4a','wav','ogg','aac'].includes(ext)) {
+        setFileInfo({ name, ext, size: file.size, isAudio: true });
+
+      } else {
+        setError(`非対応の形式: .${ext}　（対応: .json .csv .txt .docx .doc .mp3 .m4a .wav）`);
+      }
+    };
+
+    reader.onerror = () => { setError('ファイル読み込みエラー'); setLoading(false); };
+
+    if (['mp3','m4a','wav','ogg','aac'].includes(ext)) {
+      setFileInfo({ name, ext, size: file.size, isAudio: true });
+      setLoading(false);
+    } else if (ext === 'docx') {
+      // .docx は ArrayBuffer で読み込み → ZIP解析
+      const abReader = new FileReader();
+      abReader.onload = async (e) => {
+        try {
+          const text = await extractDocxText(e.target.result);
+          if (!text || text.length < 5) {
+            setError('Docxからテキストを抽出できませんでした。Word で「名前を付けて保存→.txt」に変換してから再アップしてください。');
+            setLoading(false); return;
+          }
+          setFileInfo({ name, ext, size: file.size, rawText: text });
+          setTextScan(scanText(text, db));
+        } catch(err) {
+          setError('Docx解析エラー: ' + err.message);
+        }
+        setLoading(false);
+      };
+      abReader.onerror = () => { setError('ファイル読み込みエラー'); setLoading(false); };
+      abReader.readAsArrayBuffer(file);
+    } else if (ext === 'doc') {
+      // 旧バイナリ .doc は変換ガイドを表示
+      setFileInfo({ name, ext, size: file.size, isLegacyDoc: true });
+      setLoading(false);
+    } else {
+      reader.readAsText(file, 'UTF-8');
+    }
+  };
+
+  /* ── フォルダ / 複数ファイル一括処理 ── */
+  const SUPPORTED_EXTS = new Set(['json','csv','txt','md','docx','doc','mp3','m4a','wav','ogg','aac']);
+  const processFolder = async (files) => {
+    const list = Array.from(files).filter(f => SUPPORTED_EXTS.has(f.name.split('.').pop().toLowerCase()));
+    if (!list.length) { setError('フォルダ内に対応ファイルが見つかりませんでした'); return; }
+    reset();
+    setFolderState({ phase:'processing', n:0, total:list.length, current:'', results:[] });
+    const results = [];
+    for (let i = 0; i < list.length; i++) {
+      setFolderState(s => ({...s, n:i+1, current:list[i].name}));
+      results.push(await processOneFile(list[i], db));
+    }
+    setFolderState({ phase:'done', n:list.length, total:list.length, current:'', results });
+  };
+
+  const onDrop = async (e) => {
+    e.preventDefault(); setDragging(false);
+    const items = e.dataTransfer.items;
+    // ディレクトリドロップ検出
+    if (items?.length) {
+      const entry = items[0].webkitGetAsEntry?.();
+      if (entry?.isDirectory) {
+        const files = await getFilesFromEntry(entry);
+        processFolder(files); return;
+      }
+      // 複数ファイルドロップ
+      if (e.dataTransfer.files.length > 1) {
+        processFolder(e.dataTransfer.files); return;
+      }
+    }
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  };
+
+  const fmtSize = (b) => b > 1024*1024 ? (b/1024/1024).toFixed(1)+'MB' : (b/1024).toFixed(0)+'KB';
+  const extColor = { json:'bg-blue-100 text-blue-700', csv:'bg-green-100 text-green-700',
+    txt:'bg-amber-100 text-amber-700', md:'bg-amber-100 text-amber-700',
+    docx:'bg-indigo-100 text-indigo-700', doc:'bg-indigo-100 text-indigo-700',
+    mp3:'bg-rose-100 text-rose-600', m4a:'bg-rose-100 text-rose-600', wav:'bg-rose-100 text-rose-600' };
+
+  const bulkAdd = () => {
+    if (!preview?.length) return;
+    onBulkImport(preview);
+    showToast(`📂 ${preview.length}件インポート完了！`);
+    reset(); onBack();
+  };
+
+  const addOne = (entry) => {
+    onFillForm(entry);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* ヘッダー */}
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} className="text-xs text-purple-500 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-full font-bold">← 戻る</button>
+        <span className="text-sm font-black text-amber-600">📂 フォルダAL — アップロード</span>
+      </div>
+
+      {/* ドロップゾーン */}
+      {!fileInfo && !folderState && (
+        <div>
+          {/* ドロップゾーン */}
+          <div
+            onDragOver={e=>{e.preventDefault();setDragging(true);}}
+            onDragLeave={()=>setDragging(false)}
+            onDrop={onDrop}
+            className={`border-2 border-dashed rounded-3xl p-6 text-center transition-all ${dragging ? 'border-amber-400 bg-amber-50 scale-[1.01]' : 'border-gray-200 bg-gray-50'}`}>
+            {/* hidden inputs */}
+            <input ref={inputRef} type="file"
+              accept=".json,.csv,.txt,.md,.doc,.docx,.mp3,.m4a,.wav,.ogg,.aac"
+              className="hidden"
+              onChange={e=>{ if(e.target.files[0]) processFile(e.target.files[0]); }} />
+            <input ref={folderInputRef} type="file"
+              /* webkitdirectory でフォルダ選択 */
+              className="hidden" multiple
+              onChange={e=>{ if(e.target.files?.length) processFolder(e.target.files); }}
+              {...{webkitdirectory:'', directory:''}} />
+
+            <div className="text-4xl mb-2">{dragging ? '⬇️' : '📂'}</div>
+            <p className="font-black text-gray-600 mb-3">
+              {dragging ? 'ここにドロップ！' : 'ファイル / フォルダをドロップ'}
+            </p>
+            {/* ボタン2つ */}
+            <div className="flex gap-2 justify-center mb-3">
+              <button onClick={()=>inputRef.current?.click()}
+                className="flex items-center gap-1.5 bg-white border border-gray-200 hover:border-amber-400 hover:bg-amber-50 text-gray-600 text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm">
+                📄 ファイルを選ぶ
+              </button>
+              <button onClick={()=>folderInputRef.current?.click()}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white text-xs font-black px-4 py-2 rounded-xl transition-all shadow-sm">
+                📁 フォルダを選ぶ
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              <span className="font-bold text-blue-600">.json</span> ナレッジDB &nbsp;
+              <span className="font-bold text-green-600">.csv</span> 文法リスト &nbsp;
+              <span className="font-bold text-amber-600">.txt</span> テキスト解析 &nbsp;
+              <span className="font-bold text-indigo-600">.docx/.doc</span> Word文書 &nbsp;
+              <span className="font-bold text-rose-500">.mp3/.m4a</span> 音声
+            </p>
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="text-center py-8">
+          <div className="flex justify-center gap-2 mb-3"><span className="dot"/><span className="dot"/><span className="dot"/></div>
+          <p className="text-sm text-gray-400">ファイルを読み込み中...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 flex items-start gap-2">
+          <span className="text-rose-400 text-lg shrink-0">⚠️</span>
+          <div>
+            <p className="text-sm font-bold text-rose-600">読み込みエラー</p>
+            <p className="text-xs text-rose-500 mt-0.5">{error}</p>
+          </div>
+          <button onClick={reset} className="ml-auto text-rose-300 hover:text-rose-500 text-lg">✕</button>
+        </div>
+      )}
+
+      {/* ファイル情報バッジ */}
+      {fileInfo && (
+        <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+          <span className={`text-xs font-black px-2 py-1 rounded-lg ${extColor[fileInfo.ext] || 'bg-gray-100 text-gray-600'}`}>.{fileInfo.ext}</span>
+          <span className="text-sm font-bold text-gray-700 flex-1 truncate">{fileInfo.name}</span>
+          <span className="text-xs text-gray-400 shrink-0">{fmtSize(fileInfo.size)}</span>
+          <button onClick={reset} className="text-gray-300 hover:text-gray-500 text-sm shrink-0">✕</button>
+        </div>
+      )}
+
+      {/* ─── JSON / CSV プレビュー ─── */}
+      {preview && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-black text-gray-700">
+              📋 {preview.length}件 プレビュー
+              <span className="text-xs text-gray-400 font-normal ml-2">
+                ({preview.filter(e=>db.find(d=>d.id===e.id)).length}件 重複・スキップ)
+              </span>
+            </p>
+            <button onClick={bulkAdd}
+              className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white text-xs font-black px-4 py-2 rounded-xl shadow-sm active:scale-[.97] transition-all">
+              📥 全件インポート
+            </button>
+          </div>
+          <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+            {preview.map((e,i) => {
+              const dup = !!db.find(d=>d.id===e.id);
+              return (
+                <div key={i} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 ${dup ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-white border-purple-100 shadow-sm'}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${LEVEL_COLOR[e.level]||'bg-gray-100 text-gray-500'}`}>{e.level||'?'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-700 truncate">{e.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{e.tag_zh || e.romaji}</p>
+                  </div>
+                  {dup ? (
+                    <span className="text-xs text-gray-300 shrink-0 font-bold">重複</span>
+                  ) : (
+                    <button onClick={()=>addOne(e)}
+                      className="shrink-0 text-xs bg-purple-500 hover:bg-purple-600 text-white px-2.5 py-1 rounded-lg font-bold transition-colors">
+                      ＋
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── TXT テキスト解析結果 ─── */}
+      {textScan && (
+        <div className="space-y-3">
+          <p className="text-sm font-black text-gray-700">
+            📄 テキスト解析結果 — {textScan.total}文・{textScan.found.length}件検出
+          </p>
+          {textScan.found.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-gray-400 font-bold">✅ ナレッジ登録済み</p>
+              {textScan.found.map((f,i)=>(
+                <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${LEVEL_COLOR[f.grammar.level]}`}>{f.grammar.level}</span>
+                  <span className="text-xs font-bold text-emerald-700 flex-1 truncate">{f.grammar.name}</span>
+                  <span className="text-xs text-emerald-400">{f.sentences.length}文</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {textScan.cands.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-gray-400 font-bold">💡 未登録の候補</p>
+              {textScan.cands.map((c,i)=>(
+                <div key={i} className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${LEVEL_COLOR[c.hint.level]}`}>{c.hint.level}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-amber-700 truncate">{c.hint.name}</p>
+                    <p className="text-xs text-amber-500">{c.hint.tag_zh}</p>
+                  </div>
+                  <button onClick={()=>onFillForm({name:c.hint.name,romaji:c.hint.romaji,level:c.hint.level,tag_zh:c.hint.tag_zh,pat_str:c.hint.pat_str})}
+                    className="shrink-0 text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg font-bold transition-colors">
+                    追加
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {textScan.found.length===0 && textScan.cands.length===0 && (
+            <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-200 p-6 text-center">
+              <p className="text-xs text-gray-400">文法パターンが検出されませんでした。<br/>日本語テキストを含むファイルを選んでください。</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── 音声ファイル案内 ─── */}
+      {fileInfo?.isAudio && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 text-center space-y-3">
+          <div className="text-4xl">🎵</div>
+          <p className="text-sm font-black text-rose-700">{fileInfo.name}</p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            音声ファイルはブラウザのWeb Speech APIで直接再生・文字起こしできません。<br/>
+            下の手順で文法を抽出してください。
+          </p>
+          <div className="bg-white rounded-xl border border-rose-100 p-3 text-left space-y-1.5">
+            {[
+              '① 音声ファイルをスマホ/PCのプレーヤーで再生',
+              '② このアプリの「🎤 音声文字起こし」タブに切り替え',
+              '③ マイク録音で音声を流しながら同時録音 → 文法抽出',
+            ].map((s,i)=>(
+              <p key={i} className="text-xs text-gray-600">{s}</p>
+            ))}
+          </div>
+          <button onClick={()=>{reset(); onBack();}}
+            className="w-full bg-rose-500 hover:bg-rose-600 text-white text-xs font-black py-2.5 rounded-xl transition-colors">
+            🎤 音声文字起こしに切り替える
+          </button>
+        </div>
+      )}
+
+      {/* ═══ フォルダ一括処理 ═══ */}
+      {folderState?.phase === 'processing' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin shrink-0"/>
+            <p className="text-sm font-black text-amber-700">フォルダを読み込み中...</p>
+          </div>
+          <div className="w-full bg-amber-100 rounded-full h-2">
+            <div className="bg-amber-400 h-2 rounded-full transition-all"
+              style={{width: `${(folderState.n/folderState.total)*100}%`}}/>
+          </div>
+          <p className="text-xs text-amber-600">
+            {folderState.n} / {folderState.total} ファイル処理中
+            {folderState.current && <span className="ml-2 text-amber-400 truncate">— {folderState.current}</span>}
+          </p>
+        </div>
+      )}
+
+      {folderState?.phase === 'done' && (()=>{
+        const results   = folderState.results;
+        const allEntries= results.filter(r=>r.type==='entries').flatMap(r=>r.entries);
+        const scanned   = results.filter(r=>r.type==='scan');
+        const allFound  = scanned.flatMap(r=>r.scan.found);
+        const allCands  = scanned.flatMap(r=>r.scan.cands);
+        // grammarId重複排除
+        const uniqFound = allFound.filter((f,i)=>allFound.findIndex(x=>x.grammar.id===f.grammar.id)===i);
+        const uniqCands = allCands.filter((c,i)=>allCands.findIndex(x=>x.hint.name===c.hint.name)===i);
+        const audioCount  = results.filter(r=>r.type==='audio').length;
+        const docCount    = results.filter(r=>r.type==='legacyDoc').length;
+        const errCount    = results.filter(r=>r.type==='error').length;
+        const skipCount   = results.filter(r=>r.type==='skip').length;
+
+        const bulkAllEntries = () => {
+          if (!allEntries.length) return;
+          onBulkImport(allEntries);
+          showToast(`📁 ${allEntries.length}件インポート完了！`);
+          reset(); onBack();
+        };
+
+        return (
+          <div className="space-y-4">
+            {/* サマリーヘッダー */}
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl p-4 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-black text-base">📁 フォルダ読み込み完了</p>
+                <button onClick={reset} className="text-white/70 hover:text-white text-sm">✕ リセット</button>
+              </div>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                {[
+                  {v:folderState.total, l:'総ファイル'},
+                  {v:allEntries.length, l:'文法エントリ'},
+                  {v:scanned.length,    l:'テキスト解析'},
+                  {v:errCount+skipCount+audioCount+docCount, l:'スキップ'},
+                ].map(({v,l})=>(
+                  <div key={l} className="bg-white/20 rounded-xl py-1.5">
+                    <p className="text-lg font-black">{v}</p>
+                    <p className="text-xs opacity-80">{l}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ─ JSON/CSV エントリ ─ */}
+            {allEntries.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-gray-700">📋 文法エントリ — {allEntries.length}件</p>
+                  <button onClick={bulkAllEntries}
+                    className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white text-xs font-black px-4 py-1.5 rounded-xl shadow-sm">
+                    📥 全件インポート
+                  </button>
+                </div>
+                <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                  {allEntries.map((e,i)=>{
+                    const dup = !!db.find(d=>d.id===e.id);
+                    return (
+                      <div key={i} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${dup?'bg-gray-50 opacity-50':'bg-white border-purple-100'}`}>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${LEVEL_COLOR[e.level]||'bg-gray-100 text-gray-500'}`}>{e.level||'?'}</span>
+                        <span className="text-xs font-bold text-gray-700 flex-1 truncate">{e.name}</span>
+                        {dup ? <span className="text-xs text-gray-300 font-bold">重複</span>
+                             : <button onClick={()=>{ onFillForm(e); }}
+                                 className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-lg font-bold">＋</button>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ─ テキストスキャン結果 ─ */}
+            {scanned.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-black text-gray-700">
+                  📄 テキスト解析 — {scanned.length}ファイル / ✅{uniqFound.length}件登録済み / 💡{uniqCands.length}件候補
+                </p>
+                {uniqFound.length > 0 && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {uniqFound.map((f,i)=>(
+                      <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${LEVEL_COLOR[f.grammar.level]}`}>{f.grammar.level}</span>
+                        <span className="text-xs font-bold text-emerald-700 flex-1 truncate">{f.grammar.name}</span>
+                        <span className="text-xs text-emerald-400">{f.sentences.length}文</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {uniqCands.length > 0 && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    <p className="text-xs text-gray-400 font-bold">💡 未登録の候補</p>
+                    {uniqCands.map((c,i)=>(
+                      <div key={i} className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${LEVEL_COLOR[c.hint.level]}`}>{c.hint.level}</span>
+                        <span className="text-xs font-bold text-amber-700 flex-1 truncate">{c.hint.name}</span>
+                        <button onClick={()=>onFillForm({name:c.hint.name,romaji:c.hint.romaji,level:c.hint.level,tag_zh:c.hint.tag_zh,pat_str:c.hint.pat_str})}
+                          className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-lg font-bold">追加</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─ ファイル一覧 ─ */}
+            <details className="bg-gray-50 rounded-2xl border border-gray-100">
+              <summary className="px-4 py-3 text-xs font-bold text-gray-400 cursor-pointer">📋 ファイル別詳細 ({folderState.total}件)</summary>
+              <div className="px-4 pb-3 space-y-1 max-h-48 overflow-y-auto">
+                {results.map((r,i)=>{
+                  const badge = {entries:'bg-blue-100 text-blue-600',scan:'bg-emerald-100 text-emerald-700',
+                    audio:'bg-rose-100 text-rose-600',legacyDoc:'bg-indigo-100 text-indigo-600',
+                    error:'bg-red-100 text-red-600',skip:'bg-gray-100 text-gray-400'};
+                  const label = {entries:`${r.entries?.length||0}件`,scan:`${r.scan?.found?.length||0}+${r.scan?.cands?.length||0}`,
+                    audio:'音声',legacyDoc:'.doc',error:'エラー',skip:'スキップ'};
+                  return (
+                    <div key={i} className="flex items-center gap-2 py-1">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${badge[r.type]||'bg-gray-100 text-gray-400'}`}>{label[r.type]||r.type}</span>
+                      <span className="text-xs text-gray-600 truncate flex-1">{r.name}</span>
+                      {r.type==='error' && <span className="text-xs text-red-400 shrink-0 truncate max-w-24">{r.msg}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+        );
+      })()}
+
+      {/* ─── .doc 旧バイナリ 変換ガイド ─── */}
+      {fileInfo?.isLegacyDoc && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-3xl">📄</span>
+            <div>
+              <p className="text-sm font-black text-indigo-700">{fileInfo.name}</p>
+              <p className="text-xs text-indigo-400">.doc（旧 Word 形式）</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            旧バイナリ形式 <strong>.doc</strong> はブラウザから直接テキスト抽出ができません。<br/>
+            以下のいずれかの方法で変換してからアップロードしてください。
+          </p>
+          <div className="bg-white rounded-xl border border-indigo-100 p-3 space-y-2">
+            {[
+              { step:'① Word / Google Docs で開く', sub:'ファイル → 名前を付けて保存 → .docx または .txt を選択' },
+              { step:'② Google ドライブにアップロード', sub:'ドライブで開く → ダウンロード → .docx として保存' },
+              { step:'③ テキストをコピー＆ペースト', sub:'Wordで全選択（Ctrl+A）→ コピー → .txt ファイルに貼り付け' },
+            ].map((s,i)=>(
+              <div key={i}>
+                <p className="text-xs font-bold text-indigo-700">{s.step}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+          <button onClick={reset}
+            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-black py-2.5 rounded-xl transition-colors">
+            📂 別のファイルを選ぶ
+          </button>
+        </div>
+      )}
+
+      {/* フォーマットガイド */}
+      {!fileInfo && !folderState && (
+        <details className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+          <summary className="px-4 py-3 text-xs font-bold text-gray-500 cursor-pointer hover:text-gray-700">
+            📋 対応ファイル形式ガイド
+          </summary>
+          <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
+            {[
+              { ext:'.json', color:'text-blue-600', desc:'ナレッジDBそのままインポート。IOタブのエクスポートJSONと同じ形式',
+                sample:'[{"name":"〜てしまう","level":"N4","tag_zh":"不小心做了〜",...}]' },
+              { ext:'.csv',  color:'text-green-600', desc:'Excelやスプレッドシートから書き出し可能。最低限 name 列が必要',
+                sample:'name,level,tag_zh,romaji\n〜てしまう,N4,不小心做了〜,～te shimau' },
+              { ext:'.txt',  color:'text-amber-600', desc:'日本語テキストを貼ったファイル。文法パターンを自動スキャン',
+                sample:'今日は電車で学校に行きます。猫が好きです。...' },
+              { ext:'.docx',     color:'text-indigo-600', desc:'Word文書（新形式）。本文テキストを自動抽出して文法スキャン',
+                sample:'授業ノート.docx、教材テキスト.docx など' },
+              { ext:'.doc',      color:'text-indigo-400', desc:'旧 Word バイナリ形式。.docx または .txt に変換して再アップ',
+                sample:'→ Word/Google Docs で「名前を付けて保存→.docx」' },
+              { ext:'.mp3/.m4a', color:'text-rose-500', desc:'音声ファイル。「音声文字起こし」機能への案内を表示',
+                sample:'boocoやみんなの日本語のMP3など' },
+            ].map(f=>(
+              <div key={f.ext}>
+                <span className={`text-xs font-black ${f.color}`}>{f.ext}</span>
+                <p className="text-xs text-gray-500 mt-0.5 mb-1">{f.desc}</p>
+                <pre className="bg-white text-xs text-gray-400 rounded-lg px-3 py-2 border border-gray-100 overflow-x-auto">{f.sample}</pre>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function URLFetchPanel({ db, onFillForm, onBack }) {
+  const [url,      setUrl]      = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
+  const [rawText,  setRawText]  = useState('');
+  const [results,  setResults]  = useState(null);
+
+  const doFetch = async () => {
+    if (!url.trim()) return;
+    setLoading(true); setError(''); setRawText(''); setResults(null);
+    try {
+      const text = await fetchPageText(url);
+      if (!text || text.length < 30) throw new Error('テキストを取得できませんでした');
+      setRawText(text);
+      setResults(scanText(text, db));
+    } catch(e) {
+      setError('取得失敗: ' + (e.message || 'ネットワークエラー'));
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-1">
+        <button onClick={onBack} className="text-xs text-purple-500 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-full transition-colors font-bold">← 戻る</button>
+        <span className="text-sm font-black text-emerald-700">🌐 URL取得</span>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-emerald-100 p-4 shadow-sm">
+        <label className="form-label">WebサイトのURLを入力</label>
+        <input className="form-input mb-2" placeholder="https://..." value={url} onChange={e=>{setUrl(e.target.value);setError('');}} />
+        <p className="text-xs text-gray-400 mb-3">💡 例：</p>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {SAMPLE_URLS.map((u,i) => (
+            <button key={i} onClick={()=>setUrl(u)} className="chip text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg truncate max-w-full">{u}</button>
+          ))}
+        </div>
+        <button onClick={doFetch} disabled={!url.trim() || loading}
+          className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 text-white font-black py-3 rounded-2xl transition-all shadow-md text-sm">
+          {loading
+            ? <span className="flex items-center justify-center gap-2">取得中...<span className="dot"/><span className="dot"/><span className="dot"/></span>
+            : '🌐 テキストを取得して解析'}
+        </button>
+        {error && <p className="text-xs text-rose-500 mt-2 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
+      </div>
+
+      {/* 取得テキストのプレビュー */}
+      {rawText && !loading && (
+        <details className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-xs text-gray-400">
+          <summary className="cursor-pointer font-bold select-none">📄 取得テキストのプレビュー ({rawText.length.toLocaleString()}文字)</summary>
+          <p className="mt-2 whitespace-pre-wrap line-clamp-10 text-gray-500">{rawText.slice(0,800)}{rawText.length>800?'...':''}</p>
+        </details>
+      )}
+
+      {results && <AnalyzeResults results={results} onFillForm={onFillForm} />}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   ANALYZE RESULTS — 解析結果カード
+   ══════════════════════════════════════════════ */
+function AnalyzeResults({ results, onFillForm }) {
+  const { found, cands, total } = results;
+  const empty = found.length === 0 && cands.length === 0;
+
+  return (
+    <div className="space-y-3 fiu">
+      {/* サマリー */}
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+        <span className="text-2xl">📊</span>
+        <div className="text-xs">
+          <p className="font-black text-indigo-700">解析完了 · {total}文を検索</p>
+          <p className="text-indigo-400">既知の文法 <strong>{found.length}件</strong> 検出 ／ 未登録の候補 <strong>{cands.length}件</strong> 発見</p>
+        </div>
+      </div>
+
+      {empty && (
+        <div className="text-center py-8 text-gray-400">
+          <div className="text-3xl mb-2">🔎</div>
+          <p className="text-sm">文法パターンが検出されませんでした<br/>別のテキストをお試しください</p>
+        </div>
+      )}
+
+      {/* ✅ 既知の文法 */}
+      {found.length > 0 && (
+        <div>
+          <p className="text-xs font-black text-emerald-600 mb-2">✅ 既登録の文法が検出されました（例文候補）</p>
+          {found.map(({grammar, sentences}) => (
+            <div key={grammar.id} className="bg-white border border-emerald-100 rounded-2xl p-4 mb-2 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full mr-1 ${LEVEL_COLOR[grammar.level]||'bg-gray-100 text-gray-600'}`}>{grammar.level}</span>
+                  <span className="font-bold text-gray-700 text-sm">{grammar.name}</span>
+                </div>
+                <button onClick={()=>onFillForm({...grammar, examples:[{ja:sentences[0]||'',zh:''},{ja:sentences[1]||grammar.examples?.[1]?.ja||'',zh:grammar.examples?.[1]?.zh||''}]})}
+                  className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold transition-colors">
+                  例文を更新
+                </button>
+              </div>
+              {sentences.slice(0,2).map((s,i) => (
+                <p key={i} className="text-xs text-gray-500 bg-emerald-50 rounded-lg px-3 py-1.5 mb-1">「{s}」</p>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 🔍 未登録の候補 */}
+      {cands.length > 0 && (
+        <div>
+          <p className="text-xs font-black text-amber-600 mb-2">🔍 未登録の文法候補 — 新しくナレッジに追加できます</p>
+          {cands.map(({hint, sentences}) => (
+            <div key={hint.pat_str} className="bg-white border border-amber-200 rounded-2xl p-4 mb-2 shadow-sm">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLOR[hint.level]||'bg-gray-100 text-gray-600'}`}>{hint.level}</span>
+                    <span className="font-black text-amber-700 text-sm">{hint.name}</span>
+                    <span className="text-xs text-gray-400">{hint.romaji}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">{hint.tag_zh}</p>
+                </div>
+                <button onClick={()=>onFillForm({
+                  id:'', name:hint.name, romaji:hint.romaji, level:hint.level,
+                  pat_str:hint.pat_str, tag_zh:hint.tag_zh,
+                  summary_zh:'', conj_rule:'', conj_ex:'', detail_zh:'',
+                  examples:[{ja:sentences[0]||'',zh:''},{ja:sentences[1]||'',zh:''}],
+                  quiz:{q_ja:'',q_zh:'',opts:[{id:'A',text:'',correct:true},{id:'B',text:'',correct:false}],ok_msg:'',ng_msg:''},
+                })}
+                  className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg font-bold whitespace-nowrap transition-colors shrink-0">
+                  🧠 追加フォームへ
+                </button>
+              </div>
+              {sentences.slice(0,2).map((s,i) => (
+                <p key={i} className="text-xs text-gray-500 bg-amber-50 rounded-lg px-3 py-1.5 mb-1">「{s}」</p>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   AUDIO TRANSCRIBE PANEL — 🎤 音声文字起こし
+   ══════════════════════════════════════════════ */
+function AudioTranscribePanel({ db, onFillForm, onBack }) {
+  const [transcript,  setTranscript]  = useState('');
+  const [interim,     setInterim]     = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [results,     setResults]     = useState(null);
+  const [scanning,    setScanning]    = useState(false);
+  const [error,       setError]       = useState('');
+  const [mode,        setMode]        = useState(null); // null | 'mic' | 'paste'
+  const recRef = useRef(null);
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micSupported = !!SR;
+
+  const startListening = () => {
+    if (!SR) { setError('このブラウザは音声認識に対応していません（Chrome推奨）'); return; }
+    try {
+      const rec = new SR();
+      rec.lang = 'ja-JP';
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (e) => {
+        let fin = '';
+        let inter = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+          else inter += e.results[i][0].transcript;
+        }
+        if (fin) setTranscript(t => t + fin + (fin.slice(-1).match(/[。！？]/) ? '' : '。'));
+        setInterim(inter);
+      };
+      rec.onerror = (e) => {
+        setError('音声認識エラー: ' + e.error);
+        setIsListening(false);
+        setInterim('');
+      };
+      rec.onend = () => { setIsListening(false); setInterim(''); };
+      rec.start();
+      recRef.current = rec;
+      setIsListening(true);
+      setError('');
+      setResults(null);
+    } catch(e) { setError('起動失敗: ' + e.message); }
+  };
+
+  const stopListening = () => {
+    recRef.current?.stop();
+    setIsListening(false);
+    setInterim('');
+  };
+
+  const clearAll = () => {
+    stopListening();
+    setTranscript(''); setInterim(''); setResults(null); setError('');
+  };
+
+  const doScan = () => {
+    const text = (transcript + ' ' + interim).trim();
+    if (!text) return;
+    setScanning(true);
+    setTimeout(() => { setResults(scanText(text, db)); setScanning(false); }, 500);
+  };
+
+  const fullText = transcript + (interim ? '…' + interim : '');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-1">
+        <button onClick={onBack} className="text-xs text-purple-500 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-full transition-colors font-bold">← 戻る</button>
+        <span className="text-sm font-black text-rose-600">🎤 音声文字起こし</span>
+      </div>
+
+      {/* ── モード選択 ── */}
+      {!mode && (
+        <div className="space-y-3 fiu">
+          {/* booco連携バナー */}
+          <div className="bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl px-4 py-3 shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔄</span>
+                <span className="font-black text-white text-sm">booco連携モード</span>
+              </div>
+              <a href={BOOCO_LINKS.web} target="_blank" rel="noopener noreferrer"
+                className="shrink-0 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors">
+                📱 boocoを開く ↗
+              </a>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="flex gap-1 mt-0.5">
+                {['1','2','3'].map(n => (
+                  <span key={n} className="bg-white/20 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0">{n}</span>
+                ))}
+              </div>
+              <p className="text-purple-100 text-xs leading-relaxed">
+                boocoで音声を再生 → このアプリに戻る → 下の「マイク録音」をタップして同時録音 → 文法を自動抽出
+              </p>
+            </div>
+          </div>
+
+          <div className="text-center py-1">
+            <p className="text-sm font-black text-gray-700">録音方法を選んでください</p>
+            <p className="text-xs text-gray-400 mt-0.5">音声から文法を自動抽出します</p>
+          </div>
+          {micSupported ? (
+            <button onClick={()=>setMode('mic')}
+              className="w-full bg-gradient-to-r from-pink-400 to-rose-500 text-white rounded-2xl p-4 text-left shadow-md hover:shadow-lg active:scale-[.98] transition-all">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl bg-white/20 rounded-xl w-12 h-12 flex items-center justify-center">🎙️</span>
+                <div>
+                  <p className="font-black text-base">マイク録音（リアルタイム）</p>
+                  <p className="text-white/80 text-xs mt-0.5">ブラウザが日本語を自動文字起こし</p>
+                </div>
+              </div>
+            </button>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center text-xs text-gray-400">
+              🚫 このブラウザはマイク認識に非対応です（Chrome推奨）
+            </div>
+          )}
+          <button onClick={()=>setMode('paste')}
+            className="w-full bg-gradient-to-r from-indigo-400 to-blue-500 text-white rounded-2xl p-4 text-left shadow-md hover:shadow-lg active:scale-[.98] transition-all">
+            <div className="flex items-center gap-4">
+              <span className="text-3xl bg-white/20 rounded-xl w-12 h-12 flex items-center justify-center">📋</span>
+              <div>
+                <p className="font-black text-base">文字起こし貼り付け</p>
+                <p className="text-white/80 text-xs mt-0.5">Whisper等の起こしテキストを貼付</p>
+              </div>
+            </div>
+          </button>
+          {/* ヒント */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-700">
+            <p className="font-bold mb-1">💡 使い方のコツ</p>
+            <p>①みんなの日本語などのテキスト音声を流しながら「マイク録音」でリアルタイム文字起こし</p>
+            <p className="mt-1">② ChatGPT / Whisper で文字起こしたテキストを「貼り付け」してもOK</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── マイク録音モード ── */}
+      {mode === 'mic' && (
+        <div className="space-y-3 fiu">
+          <button onClick={()=>{clearAll();setMode(null);}} className="text-xs text-gray-400 hover:text-gray-600">← モード選択に戻る</button>
+
+          {/* booco クイックアクセス */}
+          <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
+            <span className="text-base">📱</span>
+            <p className="text-xs text-purple-700 flex-1 font-medium">boocoで音声を流しながら録音しよう！</p>
+            <a href={BOOCO_LINKS.web} target="_blank" rel="noopener noreferrer"
+              className="shrink-0 text-xs bg-purple-500 hover:bg-purple-600 text-white px-2.5 py-1 rounded-lg font-bold transition-colors">
+              開く↗
+            </a>
+          </div>
+
+          {/* 録音ボタン */}
+          <div className="bg-white rounded-2xl border border-rose-100 p-4 shadow-sm text-center">
+            {!isListening ? (
+              <button onClick={startListening}
+                className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-black px-8 py-4 rounded-2xl text-lg shadow-lg hover:shadow-xl active:scale-[.98] transition-all">
+                🎙️ 録音開始
+              </button>
+            ) : (
+              <button onClick={stopListening}
+                className="bg-red-500 hover:bg-red-600 text-white font-black px-8 py-4 rounded-2xl text-lg shadow-lg animate-pulse transition-all">
+                ⏹ 録音停止
+              </button>
+            )}
+            {isListening && (
+              <p className="text-xs text-rose-400 mt-3 flex items-center justify-center gap-1">
+                <span className="dot"/> <span className="dot"/> <span className="dot"/>
+                <span className="ml-1">日本語を聴き取り中...</span>
+              </p>
+            )}
+            {error && <p className="text-xs text-red-500 mt-2 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
+          </div>
+
+          {/* 文字起こし表示 */}
+          {(fullText || isListening) && (
+            <div className="bg-white rounded-2xl border border-indigo-100 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-black text-indigo-600">📝 文字起こし結果</p>
+                <button onClick={clearAll} className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg">クリア</button>
+              </div>
+              <div className="min-h-[80px] bg-indigo-50 rounded-xl p-3 text-sm leading-relaxed">
+                <span className="text-gray-700">{transcript}</span>
+                {interim && <span className="text-indigo-300 italic">{interim}</span>}
+                {!fullText && <span className="text-gray-300 text-xs">（録音中に音声を検出すると、ここに表示されます）</span>}
+              </div>
+            </div>
+          )}
+
+          {/* 解析ボタン */}
+          {transcript && !isListening && (
+            <button onClick={doScan} disabled={scanning}
+              className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 disabled:opacity-40 text-white font-black py-3 rounded-2xl shadow-md transition-all text-sm">
+              {scanning ? '🔍 解析中...' : '🔍 文法を解析してナレッジ候補を抽出'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── 貼り付けモード ── */}
+      {mode === 'paste' && (
+        <div className="space-y-3 fiu">
+          <button onClick={()=>{clearAll();setMode(null);}} className="text-xs text-gray-400 hover:text-gray-600">← モード選択に戻る</button>
+          <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-sm">
+            <label className="form-label">文字起こしテキストを貼り付けてください</label>
+            <textarea className="form-input" rows={8}
+              placeholder={"テキスト音声の文字起こし例：\n「田中さんはどこから来ましたか。\n私は中国から来ました。\nはじめまして、どうぞよろしく。\n駅はどこにありますか。\n電車で10分ぐらいです。」"}
+              value={transcript} onChange={e=>{setTranscript(e.target.value);setResults(null);}} />
+            <button onClick={doScan} disabled={!transcript.trim() || scanning}
+              className="w-full mt-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 disabled:opacity-40 text-white font-black py-3 rounded-2xl transition-all shadow-md text-sm">
+              {scanning ? '🔍 解析中...' : '🔍 文法を解析する'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 解析結果 ── */}
+      {results && <AnalyzeResults results={results} onFillForm={onFillForm} />}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   RESOURCES PANEL — 🎧 教材音声リソース
+   ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   BACKGROUND PANEL — 授業背景・カリキュラム・参考資料
+   ══════════════════════════════════════════════ */
+function BackgroundPanel() {
+  const [expanded, setExpanded] = React.useState(null);
+  const toggle = (n) => setExpanded(prev => prev === n ? null : n);
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── 学習者プロフィール ── */}
+      <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl p-4 text-white shadow-md">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">👤</span>
+          <div>
+            <p className="font-black text-sm">学習者プロフィール</p>
+            <p className="text-indigo-200 text-xs">Learner Background · 学习者背景</p>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          {[
+            ['🎯 対象',    LEARNER_PROFILE.target],
+            ['📌 指導法',  LEARNER_PROFILE.method],
+            ['⏱ 期間',    LEARNER_PROFILE.duration],
+            ['🏆 目標',    LEARNER_PROFILE.goal],
+            ['💡 評価軸',  LEARNER_PROFILE.eval],
+          ].map(([label,val]) => (
+            <div key={label} className="bg-white/15 rounded-xl px-3 py-2 flex gap-2">
+              <span className="text-xs text-indigo-200 shrink-0 w-20">{label}</span>
+              <span className="text-xs text-white leading-relaxed">{val}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 bg-white/20 rounded-xl px-3 py-2 text-center">
+          <span className="text-lg font-black">{LEARNER_PROFILE.tagline}</span>
+          <p className="text-indigo-200 text-xs mt-0.5">{LEARNER_PROFILE.philosophy}</p>
+        </div>
+      </div>
+
+      {/* ── 8回カリキュラム ── */}
+      <div className="bg-white border border-indigo-100 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-indigo-600 text-white px-4 py-2.5 flex items-center gap-2">
+          <span className="text-lg">📅</span>
+          <div>
+            <p className="font-black text-sm">1ヶ月 全8回カリキュラム</p>
+            <p className="text-indigo-200 text-xs">みんなの日本語 第1〜10課ベース</p>
+          </div>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {CURRICULUM_CONTEXT.map(les => {
+            const isOpen = expanded === les.lesson;
+            return (
+              <div key={les.lesson}>
+                <button
+                  onClick={() => toggle(les.lesson)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+                  <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white ${les.lesson <= 4 ? 'bg-blue-500' : 'bg-orange-500'}`}>
+                    {les.lesson}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-700 truncate">{les.titleJa}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${les.lesson <= 4 ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                        Ph.{les.lesson <= 4 ? 1 : 2}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">{les.week} ／ {les.theme_cn}</p>
+                  </div>
+                  <span className="text-gray-300 text-sm shrink-0">{isOpen ? '▲' : '▼'}</span>
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-4 space-y-2 bg-gray-50">
+                    <p className="text-xs text-gray-400 font-medium pt-1">📖 {les.base}</p>
+                    {/* Key phrases */}
+                    <div className="space-y-1">
+                      {les.key_phrases.map((p,i) => (
+                        <div key={i} className="flex items-start gap-2 bg-white rounded-lg px-3 py-1.5 border border-gray-100">
+                          <span className="text-xs font-bold text-indigo-500 font-mono flex-1 leading-snug">{p.r}</span>
+                          <span className="text-xs text-gray-400 shrink-0">{p.cn}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* CN tip */}
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                      <span className="text-xs font-bold text-amber-600">💡 </span>
+                      <span className="text-xs text-amber-700 leading-relaxed">{les.cn_tip}</span>
+                    </div>
+                    {/* Homework */}
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                      <span className="text-xs font-bold text-emerald-600">🏠 宿題：</span>
+                      <span className="text-xs text-emerald-700">{les.hw}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 参考Webリソース ── */}
+      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-gray-700 text-white px-4 py-2.5 flex items-center gap-2">
+          <span className="text-lg">🌐</span>
+          <div>
+            <p className="font-black text-sm">参考Webリソース</p>
+            <p className="text-gray-300 text-xs">文法辞典・スライド・教案のリンク集</p>
+          </div>
+        </div>
+        <div className="p-3 space-y-2">
+          {WEB_RESOURCES.map(r => (
+            <div key={r.id} className="flex items-start gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+              <span className="text-xl shrink-0">{r.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-bold text-gray-700">{r.label}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${r.bc}`}>{r.badge}</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{r.desc}</p>
+              </div>
+              <a href={r.url} target="_blank" rel="noopener noreferrer"
+                className="shrink-0 text-xs bg-gray-600 hover:bg-gray-700 text-white px-2.5 py-1 rounded-lg font-bold transition-colors">
+                開く↗
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+/* booco DLハブ定数 */
+const BOOCO_LINKS = {
+  appStore:   'https://apps.apple.com/jp/app/booco/id1480779655',
+  googlePlay: 'https://play.google.com/store/apps/details?id=jp.alc.android.booco',
+  web:        'https://www.booco.jp/',
+};
+
+function ResourcesPanel({ onStartLoop }) {
+  const [boocoOpen, setBoocoOpen] = React.useState(false);
+
+  return (
+    <div className="space-y-4">
+      {/* ヘッダー */}
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+        <span className="text-2xl">🎧</span>
+        <div className="text-xs">
+          <p className="font-black text-indigo-700">教材音声ダウンロードリソース</p>
+          <p className="text-indigo-400">3シリーズの音声DLリンク集 / 免费音频下载资源</p>
+        </div>
+      </div>
+
+      {/* ══ booco DLハブ（最上部に配置） ══ */}
+      <div className="rounded-2xl overflow-hidden shadow-md border border-purple-300">
+        {/* 上部CTA */}
+        <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-4 py-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl shadow-sm shrink-0">
+              🎧
+            </div>
+            <div>
+              <p className="font-black text-white text-base leading-tight">booco</p>
+              <p className="text-purple-200 text-xs">アルク公式音声アプリ — 無料DL</p>
+            </div>
+            <span className="ml-auto bg-green-400 text-green-900 text-xs font-black px-2.5 py-1 rounded-full shrink-0">
+              無料
+            </span>
+          </div>
+          <p className="text-purple-100 text-xs leading-relaxed mb-4">
+            「できる日本語」の音声はこのアプリで聴けます。<br/>
+            速度0.5〜2倍・区間リピート・スクリプト表示に対応。
+          </p>
+          {/* Store buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <a href={BOOCO_LINKS.appStore} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-black hover:bg-gray-900 text-white rounded-xl px-3 py-2.5 transition-colors">
+              <span className="text-lg">🍎</span>
+              <div className="text-left leading-tight">
+                <p className="text-white/60" style={{fontSize:'0.6rem'}}>App Store</p>
+                <p className="font-black text-xs">無料DL</p>
+              </div>
+            </a>
+            <a href={BOOCO_LINKS.googlePlay} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 text-white rounded-xl px-3 py-2.5 transition-colors border border-white/30">
+              <span className="text-lg">▶️</span>
+              <div className="text-left leading-tight">
+                <p className="text-white/60" style={{fontSize:'0.6rem'}}>Google Play</p>
+                <p className="font-black text-xs">無料DL</p>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        {/* 使い方ステップ（トグル） */}
+        <button onClick={() => setBoocoOpen(o => !o)}
+          className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold py-2.5 px-4 flex items-center justify-between transition-colors">
+          <span>📋 boocoの使い方（3ステップ）</span>
+          <span>{boocoOpen ? '▲ 閉じる' : '▼ 開く'}</span>
+        </button>
+        {boocoOpen && (
+          <div className="bg-white px-4 py-3 space-y-2.5 border-t border-purple-100">
+            {[
+              { n:'①', icon:'📲', title:'boocoをDL',    body:'上の「App Store」または「Google Play」ボタンからインストール（無料）', color:'bg-purple-50 border-purple-200' },
+              { n:'②', icon:'🔑', title:'シリアルコードを入力', body:'「できる日本語」書籍の裏表紙にあるシリアルコードをアプリ内で入力', color:'bg-indigo-50 border-indigo-200' },
+              { n:'③', icon:'▶️', title:'音声を再生！',   body:'全レベルの音声が解放。速度調整・区間リピート・スクリプト表示で使いこなそう', color:'bg-green-50 border-green-200' },
+            ].map(s => (
+              <div key={s.n} className={`rounded-xl border px-3 py-2.5 flex gap-3 ${s.color}`}>
+                <span className="font-black text-purple-600 text-sm shrink-0">{s.n}</span>
+                <div>
+                  <span className="text-xs font-black text-gray-700">{s.icon} {s.title}</span>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{s.body}</p>
+                </div>
+              </div>
+            ))}
+            {/* 機能チップ */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {['⚡ 0.5〜2倍速','🔁 区間リピート','📄 スクリプト表示','📱 iOS / Android'].map(f => (
+                <span key={f} className="text-xs bg-purple-100 text-purple-700 font-bold px-2.5 py-1 rounded-full">{f}</span>
+              ))}
+            </div>
+            <a href={BOOCO_LINKS.web} target="_blank" rel="noopener noreferrer"
+              className="block text-center text-xs text-purple-500 hover:text-purple-700 underline py-1">
+              booco 公式サイト → {BOOCO_LINKS.web}
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ booco × AI先生 学習ループ ═══ */}
+      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center gap-2">
+          <span className="text-xl">🔄</span>
+          <div>
+            <p className="font-black text-white text-sm">booco × AI先生 学習ループ</p>
+            <p className="text-emerald-100 text-xs">聴く → 録音 → 文法抽出 → ナレッジ追加</p>
+          </div>
+        </div>
+        <div className="p-3 space-y-3">
+          {/* 4ステップフロー */}
+          <div className="flex items-center gap-1">
+            {[
+              { icon:'📱', label:'booco\n音声再生', color:'bg-purple-100 text-purple-700' },
+              { icon:'🎤', label:'AI先生\n同時録音', color:'bg-rose-100 text-rose-700' },
+              { icon:'📊', label:'文法\n自動抽出', color:'bg-amber-100 text-amber-700' },
+              { icon:'➕', label:'ナレッジ\n追加',  color:'bg-emerald-100 text-emerald-700' },
+            ].map((s, i, arr) => (
+              <React.Fragment key={i}>
+                <div className={`flex-1 rounded-xl px-1.5 py-2 text-center ${s.color}`}>
+                  <div className="text-base mb-0.5">{s.icon}</div>
+                  <div className="text-xs font-bold leading-tight whitespace-pre-line">{s.label}</div>
+                </div>
+                {i < arr.length - 1 && <span className="text-gray-300 text-xs shrink-0">▶</span>}
+              </React.Fragment>
+            ))}
+          </div>
+          {/* CTAボタン */}
+          <div className="grid grid-cols-2 gap-2">
+            <a href={BOOCO_LINKS.web} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl py-3 font-bold text-xs transition-colors">
+              📱 boocoを開く ↗
+            </a>
+            <button onClick={onStartLoop}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl py-3 font-black text-xs transition-all shadow-sm active:scale-[.97]">
+              🎤 文字起こし開始 →
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 text-center leading-relaxed">
+            ① boocoで再生 → ② このアプリに戻り「文字起こし開始」→ ③ 文法が自動抽出される
+          </p>
+        </div>
+      </div>
+
+      {/* テキストブック一覧 */}
+      {TEXTBOOK_RESOURCES.map(tb => (
+        <div key={tb.id} className={`rounded-2xl border overflow-hidden shadow-sm ${tb.borderCls}`}>
+          <div className={`${tb.headerCls} text-white px-4 py-2.5 flex items-center gap-2`}>
+            <span className="text-xl">{tb.emoji}</span>
+            <div>
+              <p className="font-black text-sm">{tb.title}</p>
+              <p className="text-white/70 text-xs">{tb.publisher}</p>
+            </div>
+          </div>
+          <div className="p-3 space-y-1.5 bg-white">
+            {tb.levels.map(lv => (
+              <div key={lv.label} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <span className="text-xs font-black text-gray-500 w-12 shrink-0">{lv.label}</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${lv.bc}`}>{lv.badge}</span>
+                <span className="text-xs text-gray-400 flex-1 truncate">{lv.info}</span>
+                {lv.badge === 'booco' ? (
+                  /* boocoエントリは専用ボタン → App Store / Play Store へ */
+                  <a href={BOOCO_LINKS.appStore} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 text-xs bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-2.5 py-1 rounded-lg font-black transition-all shadow-sm">
+                    📲 boocoで聴く
+                  </a>
+                ) : (
+                  <a href={lv.url} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-2.5 py-1 rounded-lg font-bold transition-colors">
+                    DL ↗
+                  </a>
+                )}
+              </div>
+            ))}
+            {tb.isBooco && (
+              <div className="mt-2 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-purple-400 text-sm">💡</span>
+                <p className="text-xs text-purple-600 leading-relaxed">{tb.note}</p>
+              </div>
+            )}
+            {!tb.isBooco && <p className="text-xs text-gray-500 px-1 pt-1 leading-relaxed">{tb.note}</p>}
+          </div>
+        </div>
+      ))}
+
+      {/* Podcast/Spotify ヒント */}
+      <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4">
+        <p className="text-xs font-black text-rose-600 mb-2">🎵 無料ストリーミング（TRY!）</p>
+        <p className="text-xs text-gray-500 leading-relaxed">TRY!シリーズはApple Podcast・Spotifyで全レベル配信中。<br/>書籍なしでも音声が聴けます。「TRY! N2 文法から伸ばす日本語」で検索。</p>
+      </div>
+
+      {/* 音声→ナレッジ化ガイド */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+        <p className="text-xs font-black text-amber-700 mb-2">💡 音声→ナレッジ化のワークフロー</p>
+        <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside leading-relaxed">
+          <li>boocoをDL → 音声を再生</li>
+          <li>「➕ 追加」→「🎤 音声文字起こし」を開く</li>
+          <li>音声を流しながらマイク録音 → 自動文字起こし</li>
+          <li>「文法を解析」→ 候補をナレッジに追加 🎉</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN: INPUT
+   ══════════════════════════════════════════════ */
+function InputScreen({ input, setInput, analyze }) {
+  return (
+    <div>
+      <div className="text-center mb-8 fiu">
+        <div className="text-5xl mb-3">📖</div>
+        <h1 className="text-3xl font-black gradient-text mb-2">日本語文法を学ぼう！</h1>
+        <p className="text-gray-400 text-sm">输入日语句子，AI老师来解析文法</p>
+      </div>
+      <div className="fiu1 bg-white rounded-3xl shadow-lg p-6 mb-4 border border-purple-100">
+        <label className="block text-sm font-bold text-purple-700 mb-3">
+          ✏️ 日本語の文を入力してください
+          <span className="text-gray-400 font-normal ml-2 text-xs">（请输入日语句子）</span>
+        </label>
+        <textarea value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();analyze();}}}
+          placeholder="例：日本へ行きたいです" rows={4}
+          className="w-full border-2 border-purple-100 rounded-2xl p-4 text-lg text-gray-700 resize-none placeholder-gray-300 transition-all" />
+        <button onClick={analyze} disabled={!input.trim()}
+          className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-35 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl transition-all shadow-md hover:shadow-xl active:scale-[.98]">
+          🔍 AI先生に聞く（解析）
+        </button>
+      </div>
+      <div className="fiu2 bg-white/70 rounded-2xl p-4 border border-purple-100">
+        <p className="text-xs text-gray-400 font-medium mb-3">💡 例文で試してみよう / 试试例句</p>
+        <div className="flex flex-wrap gap-2">
+          {SAMPLES.map((s,i) => (
+            <button key={i} onClick={()=>setInput(s)} className="chip text-xs bg-purple-50 text-purple-600 border border-purple-200 px-3 py-1.5 rounded-full">{s}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN: LOADING
+   ══════════════════════════════════════════════ */
+function LoadingScreen({ inputText }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 fiu">
+      <div className="floating text-7xl mb-8">👨‍🏫</div>
+      <div className="bg-white rounded-3xl shadow-lg px-10 py-7 text-center border border-purple-100 max-w-xs">
+        <p className="text-purple-700 font-black text-xl mb-1">AI先生が確認中...</p>
+        <p className="text-gray-400 text-sm mb-5">AI老师正在确认中...</p>
+        {inputText && <p className="text-xs text-gray-300 bg-gray-50 rounded-xl px-3 py-2 mb-5 truncate">「{inputText}」</p>}
+        <div className="flex justify-center gap-2"><span className="dot"/><span className="dot"/><span className="dot"/></div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN: ANALYSIS
+   ══════════════════════════════════════════════ */
+function AnalysisScreen({ grammar, onQuiz }) {
+  const lessons = LESSON_MAP[grammar.id] || [];
+  return (
+    <div className="space-y-4">
+      <div className="fiu bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 rounded-3xl p-6 text-white shadow-xl">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${LEVEL_COLOR[grammar.level]||'bg-white/20 text-white'}`}>{grammar.level}</span>
+            {lessons.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-white/20 text-white">
+                📅 第{lessons.join('・')}回で学習
+              </span>
+            )}
+          </div>
+          <span className="text-2xl">📚</span>
+        </div>
+        <p className="text-purple-200 text-xs mb-1">検出された文法 / 检测到的语法</p>
+        <h2 className="text-3xl font-black mb-1 tracking-tight">{grammar.name}</h2>
+        <p className="text-purple-300 text-xs mb-3">{grammar.romaji}</p>
+        <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3">
+          <p className="font-bold text-lg">{grammar.tag_zh}</p>
+          <p className="text-purple-200 text-xs mt-0.5">{grammar.summary_zh}</p>
+        </div>
+      </div>
+      <div className="fiu1 bg-white rounded-3xl shadow-sm p-6 border border-indigo-100">
+        <h3 className="font-bold text-indigo-700 mb-3 text-sm flex items-center gap-1.5"><span>🔧</span> 接続方式 / 接续方式</h3>
+        <div className="bg-indigo-50 rounded-2xl p-4">
+          <p className="text-indigo-700 font-bold text-sm mb-1">{grammar.conj_rule}</p>
+          <p className="text-indigo-500 text-sm">例：{grammar.conj_ex}</p>
+        </div>
+      </div>
+      <div className="fiu2 bg-white rounded-3xl shadow-sm p-6 border border-purple-100">
+        <h3 className="font-bold text-purple-700 mb-3 text-sm flex items-center gap-1.5"><span>🧠</span> 文法解説 / 语法讲解</h3>
+        <p className="text-gray-600 text-sm leading-relaxed">{grammar.detail_zh}</p>
+      </div>
+      {/* 授業でのポイント（カリキュラムヒント） */}
+      {lessons.length > 0 && (() => {
+        const les = CURRICULUM_CONTEXT.find(l => l.lesson === lessons[0]);
+        return les ? (
+          <div className="fiu2 bg-amber-50 rounded-3xl shadow-sm p-5 border border-amber-100">
+            <h3 className="font-bold text-amber-700 mb-2 text-sm flex items-center gap-1.5">
+              <span>🇨🇳</span> 中国語話者向けの学習ポイント
+              <span className="text-xs bg-amber-200 text-amber-700 px-2 py-0.5 rounded-full font-bold ml-auto">第{les.lesson}回</span>
+            </h3>
+            <p className="text-amber-800 text-sm leading-relaxed">{les.cn_tip}</p>
+          </div>
+        ) : null;
+      })()}
+      <div className="fiu3 bg-white rounded-3xl shadow-sm p-6 border border-amber-100">
+        <h3 className="font-bold text-amber-600 mb-3 text-sm flex items-center gap-1.5"><span>✍️</span> 例文 / 例句</h3>
+        <div className="space-y-3">
+          {grammar.examples.map((ex,i) => (
+            <div key={i} className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+              <p className="text-gray-800 font-bold text-base mb-1">{ex.ja}</p>
+              <p className="text-amber-600 text-sm">{ex.zh}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="fiu4">
+        <button onClick={onQuiz} className="w-full bg-gradient-to-r from-rose-500 to-orange-400 hover:from-rose-600 hover:to-orange-500 text-white font-black py-4 rounded-2xl transition-all shadow-md hover:shadow-xl active:scale-[.98]">
+          🎯 クイズに挑戦！→ 挑战练习题！
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN: QUIZ
+   ══════════════════════════════════════════════ */
+function QuizScreen({ grammar, selected, result, pick, reset, log }) {
+  const quiz = grammar.quiz;
+  return (
+    <div className="space-y-4">
+      <div className="fiu text-center py-3">
+        <div className="text-4xl mb-2">🎯</div>
+        <h2 className="text-xl font-black text-gray-700">穴埋めクイズ / 填空练习</h2>
+        <p className="text-sm text-gray-400 mt-1">正しい答えを選んでください</p>
+      </div>
+      <div className="fiu1 bg-white rounded-3xl shadow-sm p-6 border border-purple-100">
+        <span className="inline-block bg-purple-100 text-purple-600 text-xs font-bold px-3 py-1 rounded-full mb-4">{grammar.name}</span>
+        <p className="text-gray-400 text-sm mb-2">{quiz.q_zh}</p>
+        <p className="text-2xl font-black text-gray-800 leading-relaxed">{quiz.q_ja}</p>
+      </div>
+      <div className="fiu2 grid grid-cols-2 gap-3">
+        {quiz.opts.map(opt => {
+          let cls = 'bg-white border-2 border-gray-200 text-gray-700';
+          if (selected===opt.id) cls = opt.correct ? 'bg-emerald-50 border-2 border-emerald-400 text-emerald-700' : 'bg-rose-50 border-2 border-rose-300 text-rose-600';
+          else if (selected && opt.correct) cls = 'bg-emerald-50 border-2 border-emerald-300 text-emerald-600 opacity-60';
+          return (
+            <button key={opt.id} onClick={()=>pick(opt)} disabled={!!selected}
+              className={`opt-card ${cls} rounded-2xl p-5 text-center shadow-sm disabled:cursor-default`}>
+              <div className="text-3xl font-black mb-1 opacity-40">{opt.id}</div>
+              <div className="text-xl font-bold">「{opt.text}」</div>
+            </button>
+          );
+        })}
+      </div>
+      {result && (
+        <div className={`pop-in rounded-3xl p-6 text-center border-2 ${result==='ok' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+          {result==='ok' ? (
+            <><div className="text-5xl mb-2">🎉</div><p className="text-3xl font-black text-emerald-600 mb-2">正解！ 答对了！</p><p className="text-emerald-700 text-sm leading-relaxed">{quiz.ok_msg}</p></>
+          ) : (
+            <><div className="text-5xl mb-2">😅</div><p className="text-3xl font-black text-rose-500 mb-2">惜しい！ 太可惜了～</p><p className="text-rose-600 text-sm leading-relaxed">{quiz.ng_msg}</p></>
+          )}
+        </div>
+      )}
+      {result && (
+        <div className="fiu space-y-3">
+          <details className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-xs text-gray-400">
+            <summary className="cursor-pointer font-medium select-none">📊 セッションデータ（Excel連携用）/ 学习记录 JSON</summary>
+            <pre className="mt-3 bg-white rounded-xl p-3 border border-gray-100 overflow-x-auto text-gray-500 leading-relaxed">{JSON.stringify(log,null,2)}</pre>
+          </details>
+          <button onClick={reset} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-black py-4 rounded-2xl transition-all shadow-md hover:shadow-xl active:scale-[.98]">
+            🔄 もう一度挑戦する / 再试一次
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Mount */
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
