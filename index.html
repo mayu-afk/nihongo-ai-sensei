@@ -691,18 +691,39 @@ function App() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const analyze = () => {
+  const analyze = async () => {
     if (!input.trim()) return;
     t0.current = Date.now();
     setScreen('loading');
-    setTimeout(() => {
+    try {
+      // Claude API で解析（Vercel サーバーレス関数経由）
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: input }),
+      });
+      let g;
+      if (res.ok) {
+        g = await res.json();
+      } else {
+        // API失敗時はローカル検出にフォールバック
+        console.warn('API fallback to local detect');
+        g = detect(input, db);
+      }
+      setGrammar(g); setSelected(null); setResult(null);
+      setLog({ sessionId:`s_${Date.now()}`, timestamp:new Date().toISOString(),
+        userInput:input, detectedGrammarId:g.id, detectedGrammarName:g.name,
+        quizAttempted:false, quizResult:null, quizOptionSelected:null, timeSpentSeconds:0 });
+      setScreen('analysis');
+    } catch(e) {
+      // ネットワークエラー時もローカルにフォールバック
       const g = detect(input, db);
       setGrammar(g); setSelected(null); setResult(null);
       setLog({ sessionId:`s_${Date.now()}`, timestamp:new Date().toISOString(),
         userInput:input, detectedGrammarId:g.id, detectedGrammarName:g.name,
         quizAttempted:false, quizResult:null, quizOptionSelected:null, timeSpentSeconds:0 });
       setScreen('analysis');
-    }, 2200);
+    }
   };
 
   const pick = (opt) => {
